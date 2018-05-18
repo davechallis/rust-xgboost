@@ -9,14 +9,14 @@ fn main() {
     // TODO: check whether rabit should be built/linked
     // TODO: check whether build already completed
     Command::new("./build.sh")
-        .current_dir("./vendor")
+        .current_dir("./xgboost")
         .status()
         .expect("Failed to execute XGBoost build.sh script.");
 
      let bindings = bindgen::Builder::default()
         .header("wrapper.h")
-        .clang_arg("-Ivendor/include")
-        .clang_arg("-Ivendor/rabit/include")
+        .clang_arg("-Ixgboost/include")
+        .clang_arg("-Ixgboost/rabit/include")
         .generate()
         .expect("Unable to generate bindings.");
 
@@ -26,8 +26,8 @@ fn main() {
         .expect("Couldn't write bindings.");
 
     println!("cargo:rustc-flags=-l dylib=c++");
-    println!("cargo:rustc-link-search=vendor/lib");
-    println!("cargo:rustc-link-search=vendor/rabit/lib");
+    println!("cargo:rustc-link-search=xgboost/lib");
+    println!("cargo:rustc-link-search=xgboost/rabit/lib");
     println!("cargo:rustc-link-lib=static=rabit_empty");
     println!("cargo:rustc-link-lib=static=xgboost");
 }

@@ -1,9 +1,12 @@
 [package]
-name = "xgb-sys"
+name = "xgboost-sys"
 version = "0.1.0"
 authors = ["Dave Challis <dave@suicas.net>"]
 links = "xgboost"
 build = "build.rs"
+license = "MIT"
+repository = "https://github.com/davechallis/rust-xgboost"
+description = "Native bindings to the xgboost library"
 
 [dependencies]
 libc = "0.2"
