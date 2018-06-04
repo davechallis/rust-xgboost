@@ -7,6 +7,7 @@ matrix:
     - rust: nightly
   fast_finish: true
 
+cache: cargo
+
 script:
-  - cd xgboost-sys && cargo build --verbose --all
   - cd xgboost-sys && cargo test --verbose --all
