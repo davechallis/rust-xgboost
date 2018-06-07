@@ -16,3 +16,4 @@ cache: cargo
 
 script:
   - cd xgboost-sys && cargo test --verbose --all
+  - cd .. && cargo test --verbose --all

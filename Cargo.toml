@@ -1,0 +1,16 @@
+[package]
+name = "xgboost"
+version = "0.1.0"
+authors = ["Dave Challis <dave@suicas.net>"]
+license = "MIT"
+repository = "https://github.com/davechallis/rust-xgboost"
+description = "Machine learning using XGBoost"
+
+[dependencies]
+xgboost-sys = { path = "xgboost-sys", version = "0.1.0" }
+libc = "0.2"
+derive_builder = "0.5"
+log = "0.4"
+
+[dev-dependencies]
+tempdir = "0.3"
