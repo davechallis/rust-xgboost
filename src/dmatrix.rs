@@ -196,9 +196,9 @@ mod tests {
 
         let tmp_dir = tempdir::TempDir::new("xgboost-tests").expect("failed to create temp dir");
         let out_path = tmp_dir.path().join("dmat.bin");
-        dmat.save_binary(out_path, true).unwrap();
+        dmat.save_binary(&out_path, true).unwrap();
 
-        let dmat2 = DMatrix::create_from_file("/tmp/foo.bin", true).unwrap();
+        let dmat2 = DMatrix::create_from_file(&out_path, true).unwrap();
 
         assert_eq!(dmat.num_rows().unwrap(), dmat2.num_rows().unwrap());
         assert_eq!(dmat.num_cols().unwrap(), dmat2.num_cols().unwrap());
