@@ -52,21 +52,21 @@ pub fn train(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parameters;
+    use parameters::{self, learning, tree};
 
     #[test]
     fn training() {
         let dmat_train = DMatrix::create_from_file("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true).unwrap();
         let dmat_test = DMatrix::create_from_file("xgboost-sys/xgboost/demo/data/agaricus.txt.test", true).unwrap();
 
-        let tree_params = parameters::tree::TreeBoosterParametersBuilder::default()
+        let tree_params = tree::TreeBoosterParametersBuilder::default()
             .max_depth(2)
             .eta(1.0)
             .build()
             .unwrap();
-        let learning_params = parameters::learning::LearningTaskParametersBuilder::default()
-            .objective(parameters::learning::Objective::BinaryLogistic)
-            .eval_metrics(Some(vec![parameters::learning::EvaluationMetric::LogLoss]))
+        let learning_params = learning::LearningTaskParametersBuilder::default()
+            .objective(learning::Objective::BinaryLogistic)
+            .eval_metrics(learning::Metrics::Custom(vec![parameters::learning::EvaluationMetric::LogLoss]))
             .build()
             .unwrap();
         let params = parameters::ParametersBuilder::default()

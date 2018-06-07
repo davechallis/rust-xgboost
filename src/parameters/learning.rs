@@ -45,6 +45,16 @@ impl Default for Objective {
     fn default() -> Self { Objective::RegLinear }
 }
 
+/// Type of evaluation metrics to use during learning.
+#[derive(Clone)]
+pub enum Metrics {
+    /// Automatically selects metrics based on learning objective.
+    Auto,
+
+    /// Use custom list of metrics.
+    Custom(Vec<EvaluationMetric>),
+}
+
 #[derive(Clone)]
 pub enum EvaluationMetric {
     /// Root Mean Square Error.
@@ -155,7 +165,7 @@ impl ToString for EvaluationMetric {
 pub struct LearningTaskParameters {
     objective: Objective,
     base_score: f32,
-    eval_metrics: Option<Vec<EvaluationMetric>>,
+    eval_metrics: Metrics,
     seed: u64,
 }
 
@@ -164,7 +174,7 @@ impl Default for LearningTaskParameters {
         LearningTaskParameters {
             objective: Objective::default(),
             base_score: 0.5,
-            eval_metrics: None,
+            eval_metrics: Metrics::Auto,
             seed: 0,
         }
     }
@@ -178,7 +188,7 @@ impl LearningTaskParameters {
         v.push(("base_score".to_owned(), self.base_score.to_string()));
         v.push(("seed".to_owned(), self.seed.to_string()));
 
-        if let Some(eval_metrics) = &self.eval_metrics {
+        if let Metrics::Custom(eval_metrics) = &self.eval_metrics {
             for metric in eval_metrics {
                 v.push(("eval_metric".to_owned(), metric.to_string()));
             }
