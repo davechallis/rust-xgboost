@@ -1,9 +1,11 @@
-extern crate xgboost_sys;
-extern crate libc;
 #[macro_use]
 extern crate derive_builder;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate ndarray;
+extern crate xgboost_sys;
+extern crate libc;
 
 #[macro_use]
 macro_rules! xgb_call {
@@ -20,4 +22,3 @@ mod utils;
 pub mod dmatrix;
 pub mod booster;
 pub mod parameters;
-pub mod training;

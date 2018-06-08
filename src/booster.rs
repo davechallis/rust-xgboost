@@ -1,17 +1,90 @@
 use std::{slice, ffi, ptr};
+use std::collections::HashMap;
+use std::path::Path;
 use error::XGBError;
 use dmatrix::DMatrix;
 
+use ndarray;
 use xgboost_sys;
 
 use super::XGBResult;
 use parameters::Parameters;
+use utils::cstring_from_path;
 
 pub struct Booster {
     handle: xgboost_sys::BoosterHandle,
 }
 
 impl Booster {
+    /// Convenience function for creating/training a new Booster.
+    pub fn train(
+        params: &Parameters,
+        dtrain: &DMatrix,
+        num_boost_round: u32,
+        eval_sets: &[(&DMatrix, &str)],
+    ) -> XGBResult<Self> {
+        let dmats = {
+            let mut dmats = vec![dtrain];
+            for (dmat, _) in eval_sets {
+                dmats.push(dmat);
+            }
+            dmats
+        };
+
+        let mut bst = Booster::create(&dmats, &params)?;
+        let num_parallel_tree = 1;
+
+        // load distributed code checkpoint from rabit
+        let version = bst.load_rabit_checkpoint()?;
+        debug!("Loaded Rabit checkpoint: version={}", version);
+        assert!(unsafe { xgboost_sys::RabitGetWorldSize() != 1 || version == 0 });
+
+        let rank = unsafe { xgboost_sys::RabitGetRank() };
+        let start_iteration = version / 2;
+        let mut nboost = start_iteration;
+
+        for i in start_iteration..num_boost_round as i32 {
+            // distributed code: need to resume to this point
+            // skip first update if a recovery step
+            if version % 2 == 0 {
+                bst.update(&dtrain, i)?;
+                bst.save_rabit_checkpoint()?;
+            }
+
+            assert!(unsafe { xgboost_sys::RabitGetWorldSize() == 1 || version == xgboost_sys::RabitVersionNumber() });
+
+            nboost += 1;
+
+            if !eval_sets.is_empty() {
+                let eval = bst.eval_set(eval_sets, i)?;
+                println!("{}", eval);
+            }
+        }
+
+        Ok(bst)
+    }
+
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> XGBResult<()> {
+        debug!("Writing Booster to: {}", path.as_ref().display());
+        let fname = cstring_from_path(path)?;
+        xgb_call!(xgboost_sys::XGBoosterSaveModel(self.handle, fname.as_ptr()))
+    }
+
+    pub fn load<P: AsRef<Path>>(path: P) -> XGBResult<Self> {
+        debug!("Loading Booster from: {}", path.as_ref().display());
+
+        // gives more control over error messages, avoids stack trace dump from C++
+        if !path.as_ref().exists() {
+            return Err(XGBError::new(&format!("File not found: {}", path.as_ref().display())));
+        }
+
+        let fname = cstring_from_path(path)?;
+        let mut handle = ptr::null_mut();
+        xgb_call!(xgboost_sys::XGBoosterCreate(ptr::null(), 0, &mut handle))?;
+        xgb_call!(xgboost_sys::XGBoosterLoadModel(handle, fname.as_ptr()))?;
+        Ok(Booster { handle })
+    }
+
     pub fn create(dmats: &[&DMatrix], params: &Parameters) -> XGBResult<Self> {
         let mut handle = ptr::null_mut();
         // TODO: check this is safe, if any dmats are freed
@@ -48,17 +121,34 @@ impl Booster {
                                                      grad_vec.len() as u64))
     }
 
-    pub fn eval_set(&self, dmats: &[&DMatrix], names: &[&str], iteration: i32) -> XGBResult<String> {
+    // TODO: cleaner to just accept a single DMatrix, no names, no iteration, and parse/return results
+    // in some structured format? E.g. HashMap<String, f32>?
+    fn eval_set(&self, evals: &[(&DMatrix, &str)], iteration: i32) -> XGBResult<String> {
+        let (dmats, names) = {
+            let mut dmats = Vec::with_capacity(evals.len());
+            let mut names = Vec::with_capacity(evals.len());
+            for (dmat, name) in evals {
+                dmats.push(dmat);
+                names.push(name);
+            }
+            (dmats, names)
+        };
         assert_eq!(dmats.len(), names.len());
+
         let mut s: Vec<xgboost_sys::DMatrixHandle> = dmats.iter().map(|x| x.handle).collect();
 
-        let mut evnames = {
+        use libc;
+        use std::mem;
+        let mut evnames: Vec<*const libc::c_char> = {
             let mut evnames = Vec::new();
             for name in names {
-                evnames.push(ffi::CString::new(*name).unwrap().as_ptr());
+                let cstr = ffi::CString::new(*name).unwrap();
+                evnames.push(cstr.as_ptr());
+                mem::forget(cstr);
             }
             evnames
         };
+        evnames.shrink_to_fit();
         let mut out_result = ptr::null();
         xgb_call!(xgboost_sys::XGBoosterEvalOneIter(self.handle,
                                                     iteration,
@@ -68,6 +158,13 @@ impl Booster {
                                                     &mut out_result))?;
         let out = unsafe { ffi::CStr::from_ptr(out_result).to_str().unwrap().to_owned() };
         Ok(out)
+    }
+
+    /// Evaluate given matrix against
+    pub fn evaluate(&self, dmat: &DMatrix) -> XGBResult<HashMap<String, f32>> {
+        let name = "default";
+        let eval = self.eval_set(&[(dmat, name)], 0)?;
+        Ok(Booster::parse_eval_string(&eval, &[name]).remove(name).unwrap())
     }
 
     fn get_attribute_names(&self) -> XGBResult<Vec<String>> {
@@ -82,21 +179,21 @@ impl Booster {
         Ok(out_vec)
     }
 
-    pub fn predict(&self, dmat: &DMatrix) -> XGBResult<Vec<f32>> {
-        // TODO: bitmask options etc.
+    pub fn predict(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array1<f32>> {
         let option_mask = 0;
         let ntree_limit = 0;
         let mut out_len = 0;
         let mut out_result = ptr::null();
         xgb_call!(xgboost_sys::XGBoosterPredict(self.handle,
-                                          dmat.handle,
-                                          option_mask,
-                                          ntree_limit,
-                                          &mut out_len,
-                                          &mut out_result))?;
+                                                dmat.handle,
+                                                option_mask,
+                                                ntree_limit,
+                                                &mut out_len,
+                                                &mut out_result))?;
 
-        let s = unsafe { slice::from_raw_parts(out_result, out_len as usize) };
-        Ok(s.to_vec())
+        let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
+        let num_rows = dmat.num_rows().unwrap() as usize;
+        Ok(ndarray::Array1::from_vec(s))
     }
 
     pub fn get_attribute(&self, key: &str) -> XGBResult<Option<String>> {
@@ -114,6 +211,16 @@ impl Booster {
         Ok(Some(out.to_owned()))
     }
 
+    pub(crate) fn load_rabit_checkpoint(&self) -> XGBResult<i32> {
+        let mut version = 0;
+        xgb_call!(xgboost_sys::XGBoosterLoadRabitCheckpoint(self.handle, &mut version))?;
+        Ok(version)
+    }
+
+    pub(crate) fn save_rabit_checkpoint(&self) -> XGBResult<()> {
+        xgb_call!(xgboost_sys::XGBoosterSaveRabitCheckpoint(self.handle))
+    }
+
     fn set_attribute(&mut self, key: &str, value: &str) -> XGBResult<()> {
         let key = ffi::CString::new(key).unwrap();
         let value = ffi::CString::new(value).unwrap();
@@ -126,15 +233,27 @@ impl Booster {
         xgb_call!(xgboost_sys::XGBoosterSetParam(self.handle, name.as_ptr(), value.as_ptr()))
     }
 
-    pub(crate) fn load_rabit_checkpoint(&self) -> XGBResult<i32> {
-        let mut version = 0;
-        xgb_call!(xgboost_sys::XGBoosterLoadRabitCheckpoint(self.handle, &mut version))?;
-        Ok(version)
+    fn parse_eval_string(eval: &str, evnames: &[&str]) -> HashMap<String, HashMap<String, f32>> {
+        let mut result: HashMap<String, HashMap<String, f32>> = HashMap::new();
+
+        for part in eval.split('\t').skip(1) {
+            for evname in evnames {
+                if part.starts_with(evname) {
+                    let metric_parts: Vec<&str> = part[evname.len()+1..].split(':').into_iter().collect();
+                    assert_eq!(metric_parts.len(), 2);
+                    let metric = metric_parts[0];
+                    let score = metric_parts[1].parse::<f32>()
+                        .expect(&format!("Unable to parse XGBoost metrics output: {}", eval));
+
+                    let mut metric_map = result.entry(evname.to_string()).or_insert_with(HashMap::new);
+                    metric_map.insert(metric.to_owned(), score);
+                }
+            }
+        }
+
+        result
     }
 
-    pub(crate) fn save_rabit_checkpoint(&self) -> XGBResult<()> {
-        xgb_call!(xgboost_sys::XGBoosterSaveRabitCheckpoint(self.handle))
-    }
 }
 
 impl Drop for Booster {
@@ -149,7 +268,7 @@ mod tests {
     use parameters::{self, learning, tree};
 
     fn read_train_matrix() -> XGBResult<DMatrix> {
-        DMatrix::create_from_file("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true)
+        DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true)
     }
 
     fn load_test_booster() -> Booster {
@@ -201,8 +320,8 @@ mod tests {
 
     #[test]
     fn foo() {
-        let dmat_train = DMatrix::create_from_file("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true).unwrap();
-        let dmat_test = DMatrix::create_from_file("xgboost-sys/xgboost/demo/data/agaricus.txt.test", true).unwrap();
+        let dmat_train = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true).unwrap();
+        let dmat_test = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.test", true).unwrap();
 
         let tree_params = tree::TreeBoosterParametersBuilder::default()
             .max_depth(2)
@@ -211,7 +330,9 @@ mod tests {
             .unwrap();
         let learning_params = learning::LearningTaskParametersBuilder::default()
             .objective(learning::Objective::BinaryLogistic)
-            .eval_metrics(learning::Metrics::Custom(vec![learning::EvaluationMetric::LogLoss]))
+            .eval_metrics(learning::Metrics::Custom(vec![learning::EvaluationMetric::MAPCutNegative(4),
+                                                         learning::EvaluationMetric::LogLoss,
+                                                         learning::EvaluationMetric::BinaryErrorRate(0.5)]))
             .build()
             .unwrap();
         let params = parameters::ParametersBuilder::default()
@@ -224,11 +345,18 @@ mod tests {
 
         for i in 0..10 {
             booster.update(&dmat_train, i).expect("update failed");
-            booster.eval_set(&[&dmat_train, &dmat_test], &["train", "test"], i).unwrap();
         }
 
+        let train_metrics = booster.evaluate(&dmat_train).unwrap();
+        assert_eq!(*train_metrics.get("logloss").unwrap(), 0.006634);
+        assert_eq!(*train_metrics.get("map@4-").unwrap(), 0.001274);
+
+        let test_metrics = booster.evaluate(&dmat_test).unwrap();
+        assert_eq!(*test_metrics.get("logloss").unwrap(), 0.00692);
+        assert_eq!(*test_metrics.get("map@4-").unwrap(), 0.005155);
+
         let v = booster.predict(&dmat_test).unwrap();
-        assert_eq!(v.len(), 1611);
+        assert_eq!(v.len(), dmat_test.num_rows().unwrap());
 
         // first 10 predictions
         let expected_start = [0.0050151693,
@@ -254,13 +382,33 @@ mod tests {
                             0.002855195,
                             0.9981102];
         let eps = 1e-6;
+
         for (pred, expected) in v.iter().zip(&expected_start) {
             println!("predictions={}, expected={}", pred, expected);
             assert!(pred - expected < eps);
         }
-        for (pred, expected) in v[v.len()-expected_end.len()..v.len()].iter().zip(&expected_end) {
+
+        for (pred, expected) in v.slice(s![-10..]).iter().zip(&expected_end) {
             println!("predictions={}, expected={}", pred, expected);
             assert!(pred - expected < eps);
         }
+    }
+
+    #[test]
+    fn parse_eval_string() {
+        let s = "[0]\ttrain-map@4-:0.5\ttrain-logloss:1.0\ttest-map@4-:0.25\ttest-logloss:0.75";
+        let mut metrics = HashMap::new();
+
+        let mut train_metrics = HashMap::new();
+        train_metrics.insert("map@4-".to_owned(), 0.5);
+        train_metrics.insert("logloss".to_owned(), 1.0);
+
+        let mut test_metrics = HashMap::new();
+        test_metrics.insert("map@4-".to_owned(), 0.25);
+        test_metrics.insert("logloss".to_owned(), 0.75);
+
+        metrics.insert("train".to_owned(), train_metrics);
+        metrics.insert("test".to_owned(), test_metrics);
+        assert_eq!(Booster::parse_eval_string(s, &["train", "test"]), metrics);
     }
 }

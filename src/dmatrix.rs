@@ -17,7 +17,7 @@ pub struct DMatrix {
 
 impl DMatrix {
     /// Create a new `DMatrix` from given file (LibSVM or binary format).
-    pub fn create_from_file<P: AsRef<Path>>(path: P, silent: bool) -> XGBResult<Self> {
+    pub fn load<P: AsRef<Path>>(path: P, silent: bool) -> XGBResult<Self> {
         let mut handle = ptr::null_mut();
         let fname = utils::cstring_from_path(path)?;
         xgb_call!(xgboost_sys::XGDMatrixCreateFromFile(fname.as_ptr(), silent as i32, &mut handle))?;
@@ -52,22 +52,32 @@ impl DMatrix {
         Ok(DMatrix { handle })
     }
 
+    pub fn from_dense(data: &[f32], num_rows: usize, num_cols: usize, missing: f32) -> XGBResult<Self> {
+        let mut handle = ptr::null_mut();
+        xgb_call!(xgboost_sys::XGDMatrixCreateFromMat(data.as_ptr(),
+                                                      num_rows as xgboost_sys::bst_ulong,
+                                                      num_cols as xgboost_sys::bst_ulong,
+                                                      missing,
+                                                      &mut handle))?;
+        Ok(DMatrix { handle })
+    }
+
     /// Serialise this `DMatrix` as a binary file.
-    pub fn save_binary<P: AsRef<Path>>(&self, path: P, silent: bool) -> XGBResult<()> {
+    pub fn save<P: AsRef<Path>>(&self, path: P, silent: bool) -> XGBResult<()> {
         let fname = utils::cstring_from_path(path)?;
         xgb_call!(xgboost_sys::XGDMatrixSaveBinary(self.handle, fname.as_ptr(), silent as i32))
     }
 
-    pub fn num_rows(&self) -> XGBResult<u64> {
+    pub fn num_rows(&self) -> XGBResult<usize> {
         let mut out = 0;
         xgb_call!(xgboost_sys::XGDMatrixNumRow(self.handle, &mut out))?;
-        Ok(out)
+        Ok(out as usize)
     }
 
-    pub fn num_cols(&self) -> XGBResult<u64> {
+    pub fn num_cols(&self) -> XGBResult<usize> {
         let mut out = 0;
         xgb_call!(xgboost_sys::XGDMatrixNumCol(self.handle, &mut out))?;
-        Ok(out)
+        Ok(out as usize)
     }
 
     /// Gets the specified root index of each instance, can be used for multi task setting.
@@ -172,7 +182,7 @@ mod tests {
     extern crate tempdir;
     use super::*;
     fn read_train_matrix() -> XGBResult<DMatrix> {
-        DMatrix::create_from_file("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true)
+        DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true)
     }
 
     #[test]
@@ -196,9 +206,9 @@ mod tests {
 
         let tmp_dir = tempdir::TempDir::new("xgboost-tests").expect("failed to create temp dir");
         let out_path = tmp_dir.path().join("dmat.bin");
-        dmat.save_binary(&out_path, true).unwrap();
+        dmat.save(&out_path, true).unwrap();
 
-        let dmat2 = DMatrix::create_from_file(&out_path, true).unwrap();
+        let dmat2 = DMatrix::load(&out_path, true).unwrap();
 
         assert_eq!(dmat.num_rows().unwrap(), dmat2.num_rows().unwrap());
         assert_eq!(dmat.num_cols().unwrap(), dmat2.num_cols().unwrap());
@@ -281,5 +291,22 @@ mod tests {
         let dmat = DMatrix::from_csc(&indptr, &indices, &data, Some(10)).unwrap();
         assert_eq!(dmat.num_rows().unwrap(), 10);
         assert_eq!(dmat.num_cols().unwrap(), 4);
+    }
+
+    #[test]
+    fn from_dense() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+
+        let dmat = DMatrix::from_dense(&data, 2, 3, 0.0).unwrap();
+        assert_eq!(dmat.num_rows().unwrap(), 2);
+        assert_eq!(dmat.num_cols().unwrap(), 3);
+
+        let dmat = DMatrix::from_dense(&data, 1, 6, 0.0).unwrap();
+        assert_eq!(dmat.num_rows().unwrap(), 1);
+        assert_eq!(dmat.num_cols().unwrap(), 6);
+
+        let dmat = DMatrix::from_dense(&data, 10, 20, 0.5).unwrap();
+        assert_eq!(dmat.num_rows().unwrap(), 10);
+        assert_eq!(dmat.num_cols().unwrap(), 20);
     }
 }
