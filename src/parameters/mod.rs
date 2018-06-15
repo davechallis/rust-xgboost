@@ -14,7 +14,7 @@ pub struct Parameters {
     /// while gblinear uses linear function.
     booster_params: booster::BoosterParameters,
 
-    learning_params: learning::LearningTaskParameters,
+    pub(crate) learning_params: learning::LearningTaskParameters,
 
     /// Whether to print running messages or not.
     silent: bool,

@@ -9,6 +9,7 @@ use xgboost_sys;
 
 use super::XGBResult;
 use parameters::Parameters;
+use parameters::learning::Objective;
 use utils::cstring_from_path;
 
 enum PredictOption {
@@ -73,7 +74,13 @@ impl Booster {
             // distributed code: need to resume to this point
             // skip first update if a recovery step
             if version % 2 == 0 {
-                bst.update(&dtrain, i)?;
+                if let Objective::Custom(objective_fn) = params.learning_params.objective {
+                    let pred = bst.predict(dtrain)?;
+                    let (gradient, hessian) = objective_fn(&pred.to_vec(), dtrain);
+                    bst.boost(dtrain, &gradient, &hessian)?;
+                } else {
+                    bst.update(&dtrain, i)?;
+                }
                 bst.save_rabit_checkpoint()?;
             }
 

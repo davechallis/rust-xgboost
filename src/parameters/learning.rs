@@ -1,6 +1,8 @@
 use std::default::Default;
+use dmatrix::DMatrix;
 
-#[derive(Clone)]
+type CustomObjective = fn(&[f32], &DMatrix) -> (Vec<f32>, Vec<f32>);
+
 pub enum Objective {
     RegLinear,
     RegLogistic,
@@ -17,7 +19,15 @@ pub enum Objective {
     RankPairwise,
     RegGamma,
     RegTweedie,
+    Custom(CustomObjective),
 }
+
+impl Copy for Objective {}
+
+impl Clone for Objective {
+    fn clone(&self) -> Self { *self }
+}
+
 
 impl ToString for Objective {
     fn to_string(&self) -> String {
@@ -37,6 +47,7 @@ impl ToString for Objective {
             Objective::RankPairwise => "rank:pairwise".to_owned(),
             Objective::RegGamma => "reg:gamma".to_owned(),
             Objective::RegTweedie => "reg:tweedie".to_owned(),
+            Objective::Custom(_) => panic!("to_string should never be called for Custom"),
         }
     }
 }
@@ -163,7 +174,7 @@ impl ToString for EvaluationMetric {
 #[derive(Builder, Clone)]
 #[builder(default)]
 pub struct LearningTaskParameters {
-    objective: Objective,
+    pub(crate) objective: Objective,
     base_score: f32,
     eval_metrics: Metrics,
     seed: u64,
@@ -184,7 +195,10 @@ impl LearningTaskParameters {
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
         let mut v = Vec::new();
 
-        v.push(("objective".to_owned(), self.objective.to_string()));
+        match self.objective {
+            Objective::Custom(_) => (),
+            objective => v.push(("objective".to_owned(), objective.to_string())),
+        }
         v.push(("base_score".to_owned(), self.base_score.to_string()));
         v.push(("seed".to_owned(), self.seed.to_string()));
 
