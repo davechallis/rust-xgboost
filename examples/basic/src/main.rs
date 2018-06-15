@@ -9,7 +9,9 @@ fn main() {
     // Load train and test matrices from text files (in LibSVM format).
     println!("Loading train and test matrices...");
     let dtrain = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.train", false).unwrap();
+    println!("Train matrix: {}x{}", dtrain.num_rows(), dtrain.num_cols());
     let dtest = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.test", false).unwrap();
+    println!("Test matrix: {}x{}", dtest.num_rows(), dtest.num_cols());
 
     // Configure booster to use tree model, and configure tree parameters.
     let booster_params = parameters::booster::BoosterParameters::GbTree(

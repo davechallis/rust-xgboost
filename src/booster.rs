@@ -242,7 +242,7 @@ impl Booster {
                                                 &mut out_result))?;
 
         let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
-        let num_rows = dmat.num_rows().unwrap() as usize;
+        let num_rows = dmat.num_rows();
 
         // TODO: re-wrap error as XGBResult
         Ok(ndarray::Array2::from_shape_vec((num_rows, s.len() / num_rows), s).unwrap())
@@ -268,7 +268,7 @@ impl Booster {
                                                 &mut out_result))?;
 
         let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
-        let num_rows = dmat.num_rows().unwrap() as usize;
+        let num_rows = dmat.num_rows();
 
         // TODO: re-wrap error as XGBResult
         Ok(ndarray::Array2::from_shape_vec((num_rows, s.len() / num_rows), s).unwrap())
@@ -295,7 +295,7 @@ impl Booster {
                                                 &mut out_result))?;
 
         let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
-        let num_rows = dmat.num_rows().unwrap() as usize;
+        let num_rows = dmat.num_rows();
 
         // TODO: re-wrap error as XGBResult
         let dim = ((s.len() / num_rows) as f64).sqrt() as usize;
@@ -462,7 +462,7 @@ mod tests {
         assert_eq!(*test_metrics.get("map@4-").unwrap(), 0.005155);
 
         let v = booster.predict(&dmat_test).unwrap();
-        assert_eq!(v.len(), dmat_test.num_rows().unwrap());
+        assert_eq!(v.len(), dmat_test.num_rows());
 
         // first 10 predictions
         let expected_start = [0.0050151693,
@@ -529,7 +529,7 @@ mod tests {
         }
 
         let preds = booster.predict_leaf(&dmat_test).unwrap();
-        let num_samples = dmat_test.num_rows().unwrap();
+        let num_samples = dmat_test.num_rows();
         assert_eq!(preds.shape(), &[num_samples, num_rounds as usize]);
     }
 
@@ -562,8 +562,8 @@ mod tests {
         }
 
         let preds = booster.predict_contributions(&dmat_test).unwrap();
-        let num_samples = dmat_test.num_rows().unwrap();
-        let num_features = dmat_train.num_cols().unwrap();
+        let num_samples = dmat_test.num_rows();
+        let num_features = dmat_train.num_cols();
         assert_eq!(preds.shape(), &[num_samples, num_features + 1]);
     }
 
@@ -596,8 +596,8 @@ mod tests {
         }
 
         let preds = booster.predict_interactions(&dmat_test).unwrap();
-        let num_samples = dmat_test.num_rows().unwrap();
-        let num_features = dmat_train.num_cols().unwrap();
+        let num_samples = dmat_test.num_rows();
+        let num_features = dmat_train.num_cols();
         assert_eq!(preds.shape(), &[num_samples, num_features + 1, num_features + 1]);
     }
 

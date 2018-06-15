@@ -13,15 +13,29 @@ static KEY_BASE_MARGIN: &'static str = "base_margin";
 /// Data Matrix used in XGBoost.
 pub struct DMatrix {
     pub(super) handle: xgboost_sys::DMatrixHandle,
+    num_rows: usize,
+    num_cols: usize,
 }
 
 impl DMatrix {
+    fn new(handle: xgboost_sys::DMatrixHandle) -> XGBResult<Self> {
+        let mut out = 0;
+        xgb_call!(xgboost_sys::XGDMatrixNumRow(handle, &mut out))?;
+        let num_rows = out as usize;
+
+        let mut out = 0;
+        xgb_call!(xgboost_sys::XGDMatrixNumCol(handle, &mut out))?;
+        let num_cols = out as usize;
+
+        Ok(DMatrix { handle, num_rows, num_cols })
+    }
+
     /// Create a new `DMatrix` from given file (LibSVM or binary format).
     pub fn load<P: AsRef<Path>>(path: P, silent: bool) -> XGBResult<Self> {
         let mut handle = ptr::null_mut();
         let fname = utils::cstring_from_path(path)?;
         xgb_call!(xgboost_sys::XGDMatrixCreateFromFile(fname.as_ptr(), silent as i32, &mut handle))?;
-        Ok(DMatrix { handle })
+        Ok(DMatrix::new(handle)?)
     }
 
     pub fn from_csr(indptr: &[usize], indices: &[u32], data: &[f32], num_cols: Option<usize>) -> XGBResult<Self> {
@@ -35,7 +49,7 @@ impl DMatrix {
                                                         data.len(),
                                                         num_cols,
                                                         &mut handle))?;
-        Ok(DMatrix { handle })
+        Ok(DMatrix::new(handle)?)
     }
 
     pub fn from_csc(indptr: &[usize], indices: &[u32], data: &[f32], num_rows: Option<usize>) -> XGBResult<Self> {
@@ -49,7 +63,7 @@ impl DMatrix {
                                                         data.len(),
                                                         num_rows,
                                                         &mut handle))?;
-        Ok(DMatrix { handle })
+        Ok(DMatrix::new(handle)?)
     }
 
     pub fn from_dense(data: &[f32], num_rows: usize, num_cols: usize, missing: f32) -> XGBResult<Self> {
@@ -59,7 +73,7 @@ impl DMatrix {
                                                       num_cols as xgboost_sys::bst_ulong,
                                                       missing,
                                                       &mut handle))?;
-        Ok(DMatrix { handle })
+        Ok(DMatrix::new(handle)?)
     }
 
     /// Serialise this `DMatrix` as a binary file.
@@ -68,16 +82,12 @@ impl DMatrix {
         xgb_call!(xgboost_sys::XGDMatrixSaveBinary(self.handle, fname.as_ptr(), silent as i32))
     }
 
-    pub fn num_rows(&self) -> XGBResult<usize> {
-        let mut out = 0;
-        xgb_call!(xgboost_sys::XGDMatrixNumRow(self.handle, &mut out))?;
-        Ok(out as usize)
+    pub fn num_rows(&self) -> usize {
+        self.num_rows
     }
 
-    pub fn num_cols(&self) -> XGBResult<usize> {
-        let mut out = 0;
-        xgb_call!(xgboost_sys::XGDMatrixNumCol(self.handle, &mut out))?;
-        Ok(out as usize)
+    pub fn num_cols(&self) -> usize {
+        self.num_cols
     }
 
     /// Gets the specified root index of each instance, can be used for multi task setting.
@@ -192,12 +202,12 @@ mod tests {
 
     #[test]
     fn read_num_rows() {
-        assert_eq!(read_train_matrix().unwrap().num_rows().unwrap(), 6513);
+        assert_eq!(read_train_matrix().unwrap().num_rows(), 6513);
     }
 
     #[test]
     fn read_num_cols() {
-        assert_eq!(read_train_matrix().unwrap().num_cols().unwrap(), 127);
+        assert_eq!(read_train_matrix().unwrap().num_cols(), 127);
     }
 
     #[test]
@@ -210,8 +220,8 @@ mod tests {
 
         let dmat2 = DMatrix::load(&out_path, true).unwrap();
 
-        assert_eq!(dmat.num_rows().unwrap(), dmat2.num_rows().unwrap());
-        assert_eq!(dmat.num_cols().unwrap(), dmat2.num_cols().unwrap());
+        assert_eq!(dmat.num_rows(), dmat2.num_rows());
+        assert_eq!(dmat.num_cols(), dmat2.num_cols());
         // TODO: check contents as well, if possible
     }
 
@@ -270,12 +280,12 @@ mod tests {
         let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
 
         let dmat = DMatrix::from_csr(&indptr, &indices, &data, None).unwrap();
-        assert_eq!(dmat.num_rows().unwrap(), 4);
-        assert_eq!(dmat.num_cols().unwrap(), 3);
+        assert_eq!(dmat.num_rows(), 4);
+        assert_eq!(dmat.num_cols(), 3);
 
         let dmat = DMatrix::from_csr(&indptr, &indices, &data, Some(10)).unwrap();
-        assert_eq!(dmat.num_rows().unwrap(), 4);
-        assert_eq!(dmat.num_cols().unwrap(), 10);
+        assert_eq!(dmat.num_rows(), 4);
+        assert_eq!(dmat.num_cols(), 10);
     }
 
     #[test]
@@ -285,12 +295,12 @@ mod tests {
         let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
 
         let dmat = DMatrix::from_csc(&indptr, &indices, &data, None).unwrap();
-        assert_eq!(dmat.num_rows().unwrap(), 3);
-        assert_eq!(dmat.num_cols().unwrap(), 4);
+        assert_eq!(dmat.num_rows(), 3);
+        assert_eq!(dmat.num_cols(), 4);
 
         let dmat = DMatrix::from_csc(&indptr, &indices, &data, Some(10)).unwrap();
-        assert_eq!(dmat.num_rows().unwrap(), 10);
-        assert_eq!(dmat.num_cols().unwrap(), 4);
+        assert_eq!(dmat.num_rows(), 10);
+        assert_eq!(dmat.num_cols(), 4);
     }
 
     #[test]
@@ -298,15 +308,15 @@ mod tests {
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
 
         let dmat = DMatrix::from_dense(&data, 2, 3, 0.0).unwrap();
-        assert_eq!(dmat.num_rows().unwrap(), 2);
-        assert_eq!(dmat.num_cols().unwrap(), 3);
+        assert_eq!(dmat.num_rows(), 2);
+        assert_eq!(dmat.num_cols(), 3);
 
         let dmat = DMatrix::from_dense(&data, 1, 6, 0.0).unwrap();
-        assert_eq!(dmat.num_rows().unwrap(), 1);
-        assert_eq!(dmat.num_cols().unwrap(), 6);
+        assert_eq!(dmat.num_rows(), 1);
+        assert_eq!(dmat.num_cols(), 6);
 
         let dmat = DMatrix::from_dense(&data, 10, 20, 0.5).unwrap();
-        assert_eq!(dmat.num_rows().unwrap(), 10);
-        assert_eq!(dmat.num_cols().unwrap(), 20);
+        assert_eq!(dmat.num_rows(), 10);
+        assert_eq!(dmat.num_cols(), 20);
     }
 }
