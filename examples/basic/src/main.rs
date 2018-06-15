@@ -1,5 +1,8 @@
 extern crate xgboost;
+extern crate sprs;
 
+use std::io::{BufRead, BufReader};
+use std::fs::File;
 use xgboost::{parameters, dmatrix::DMatrix, booster::Booster};
 
 fn main() {
@@ -70,8 +73,45 @@ fn main() {
     let result = Booster::load("/does/not/exist");
     match result {
         Ok(_bst) => (),
-        Err(err) => println!("Failed to load booster: {}", err),
+        Err(err) => println!("Got expected error: {}", err),
     }
 
+    // Sparse matrix usage
+    println!("\nSparse matrix construction...");
 
+    // f32 label for each row of data
+    let mut labels = Vec::new();
+
+    // construct sparse matrix in triplet format, then convert to CSR/CSC later
+    let mut rows = Vec::new();
+    let mut cols = Vec::new();
+    let mut data = Vec::new();
+
+    let reader = BufReader::new(File::open("../../xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap());
+    let mut current_row = 0;
+    for line in reader.lines() {
+        let line = line.unwrap();
+        let sample: Vec<&str> = line.split_whitespace().collect();
+        labels.push(sample[0].parse::<f32>().unwrap());
+
+        for entry in &sample[1..] {
+            let pair: Vec<&str> = entry.split(':').collect();
+            rows.push(current_row);
+            cols.push(pair[0].parse::<usize>().unwrap());
+            data.push(pair[1].parse::<f32>().unwrap());
+        }
+
+        current_row += 1;
+    }
+
+    // work out size of sparse matrix from max row/col values
+    let shape = (*rows.iter().max().unwrap() + 1 as usize,
+                 *cols.iter().max().unwrap() + 1 as usize);
+    let triplet_mat = sprs::TriMatBase::from_triplets(shape, rows, cols, data);
+    let csr_mat = triplet_mat.to_csr();
+
+    let indices: Vec<u32> = csr_mat.indices().into_iter().map(|i| *i as u32).collect();
+    let mut dtrain = DMatrix::from_csr(csr_mat.indptr(), &indices, csr_mat.data(), None).unwrap();
+    dtrain.set_labels(&labels);
+    let bst = Booster::train(&params, &dtrain, num_round, &evaluation_sets).unwrap();
 }

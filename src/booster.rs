@@ -11,6 +11,32 @@ use super::XGBResult;
 use parameters::Parameters;
 use utils::cstring_from_path;
 
+enum PredictOption {
+    OutputMargin,
+    PredictLeaf,
+    PredictContribitions,
+    ApproximateContributions,
+    PredictInteractions,
+}
+
+impl PredictOption {
+    fn options_as_mask(options: &[PredictOption]) -> i32 {
+        let mut option_mask = 0x00;
+        for option in options {
+            let value = match *option {
+                PredictOption::OutputMargin => 0x01,
+                PredictOption::PredictLeaf => 0x02,
+                PredictOption::PredictContribitions => 0x04,
+                PredictOption::ApproximateContributions => 0x08,
+                PredictOption::PredictInteractions => 0x10,
+            };
+            option_mask |= value;
+        }
+
+        option_mask
+    }
+}
+
 pub struct Booster {
     handle: xgboost_sys::BoosterHandle,
 }
@@ -179,8 +205,32 @@ impl Booster {
         Ok(out_vec)
     }
 
+    /// Predict results for given data.
+    ///
+    /// Returns an array containing one entry per row in the given data.
     pub fn predict(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array1<f32>> {
-        let option_mask = 0;
+        let option_mask = PredictOption::options_as_mask(&[]);
+        let ntree_limit = 0;
+        let mut out_len = 0;
+        let mut out_result = ptr::null();
+        xgb_call!(xgboost_sys::XGBoosterPredict(self.handle,
+                                                dmat.handle,
+                                                option_mask,
+                                                ntree_limit,
+                                                &mut out_len,
+                                                &mut out_result))?;
+
+        let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
+        Ok(ndarray::Array1::from_vec(s))
+    }
+
+    /// Get predicted leaf index for each sample in given data.
+    ///
+    /// Returns an array of shape (number of samples, number of trees).
+    ///
+    /// Note: the leaf index of a tree is unique per tree, so e.g. leaf 1 could be found in both tree 1 and tree 0.
+    pub fn predict_leaf(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array2<f32>> {
+        let option_mask = PredictOption::options_as_mask(&[PredictOption::PredictLeaf]);
         let ntree_limit = 0;
         let mut out_len = 0;
         let mut out_result = ptr::null();
@@ -193,7 +243,63 @@ impl Booster {
 
         let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         let num_rows = dmat.num_rows().unwrap() as usize;
-        Ok(ndarray::Array1::from_vec(s))
+
+        // TODO: re-wrap error as XGBResult
+        Ok(ndarray::Array2::from_shape_vec((num_rows, s.len() / num_rows), s).unwrap())
+    }
+
+    /// Get feature contributions (SHAP values) for each prediction.
+    ///
+    /// The sum of all feature contributions is equal to the run untransformed margin value of the
+    /// prediction.
+    ///
+    /// Returns an array of shape (number of samples, number of features + 1). The final column contains the
+    /// bias term.
+    pub fn predict_contributions(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array2<f32>> {
+        let option_mask = PredictOption::options_as_mask(&[PredictOption::PredictContribitions]);
+        let ntree_limit = 0;
+        let mut out_len = 0;
+        let mut out_result = ptr::null();
+        xgb_call!(xgboost_sys::XGBoosterPredict(self.handle,
+                                                dmat.handle,
+                                                option_mask,
+                                                ntree_limit,
+                                                &mut out_len,
+                                                &mut out_result))?;
+
+        let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
+        let num_rows = dmat.num_rows().unwrap() as usize;
+
+        // TODO: re-wrap error as XGBResult
+        Ok(ndarray::Array2::from_shape_vec((num_rows, s.len() / num_rows), s).unwrap())
+    }
+
+    /// Get SHAP interaction values for each pair of features for each prediction.
+    ///
+    /// The sum of each row (or column) of the interaction values equals the corresponding SHAP
+    /// value (from `predict_contributions`), and the sum of the entire matrix equals the raw
+    /// untransformed margin value of the prediction.
+    ///
+    /// Returns an array of shape (number of samples, number of features + 1, number of features + 1).
+    /// The final row and column contain the bias terms.
+    pub fn predict_interactions(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array3<f32>> {
+        let option_mask = PredictOption::options_as_mask(&[PredictOption::PredictInteractions]);
+        let ntree_limit = 0;
+        let mut out_len = 0;
+        let mut out_result = ptr::null();
+        xgb_call!(xgboost_sys::XGBoosterPredict(self.handle,
+                                                dmat.handle,
+                                                option_mask,
+                                                ntree_limit,
+                                                &mut out_len,
+                                                &mut out_result))?;
+
+        let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
+        let num_rows = dmat.num_rows().unwrap() as usize;
+
+        // TODO: re-wrap error as XGBResult
+        let dim = ((s.len() / num_rows) as f64).sqrt() as usize;
+        Ok(ndarray::Array3::from_shape_vec((num_rows, dim, dim), s).unwrap())
     }
 
     pub fn get_attribute(&self, key: &str) -> XGBResult<Option<String>> {
@@ -319,7 +425,7 @@ mod tests {
     }
 
     #[test]
-    fn foo() {
+    fn predict() {
         let dmat_train = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true).unwrap();
         let dmat_test = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.test", true).unwrap();
 
@@ -392,6 +498,107 @@ mod tests {
             println!("predictions={}, expected={}", pred, expected);
             assert!(pred - expected < eps);
         }
+    }
+
+    #[test]
+    fn predict_leaf() {
+        let dmat_train = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true).unwrap();
+        let dmat_test = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.test", true).unwrap();
+
+        let tree_params = tree::TreeBoosterParametersBuilder::default()
+            .max_depth(2)
+            .eta(1.0)
+            .build()
+            .unwrap();
+        let learning_params = learning::LearningTaskParametersBuilder::default()
+            .objective(learning::Objective::BinaryLogistic)
+            .eval_metrics(learning::Metrics::Custom(vec![learning::EvaluationMetric::LogLoss]))
+            .build()
+            .unwrap();
+        let params = parameters::ParametersBuilder::default()
+            .booster_params(parameters::booster::BoosterParameters::GbTree(tree_params))
+            .learning_params(learning_params)
+            .silent(true)
+            .build()
+            .unwrap();
+        let mut booster = Booster::create(&[&dmat_train, &dmat_test], &params).unwrap();
+
+        let num_rounds = 15;
+        for i in 0..num_rounds {
+            booster.update(&dmat_train, i).expect("update failed");
+        }
+
+        let preds = booster.predict_leaf(&dmat_test).unwrap();
+        let num_samples = dmat_test.num_rows().unwrap();
+        assert_eq!(preds.shape(), &[num_samples, num_rounds as usize]);
+    }
+
+    #[test]
+    fn predict_contributions() {
+        let dmat_train = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true).unwrap();
+        let dmat_test = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.test", true).unwrap();
+
+        let tree_params = tree::TreeBoosterParametersBuilder::default()
+            .max_depth(2)
+            .eta(1.0)
+            .build()
+            .unwrap();
+        let learning_params = learning::LearningTaskParametersBuilder::default()
+            .objective(learning::Objective::BinaryLogistic)
+            .eval_metrics(learning::Metrics::Custom(vec![learning::EvaluationMetric::LogLoss]))
+            .build()
+            .unwrap();
+        let params = parameters::ParametersBuilder::default()
+            .booster_params(parameters::booster::BoosterParameters::GbTree(tree_params))
+            .learning_params(learning_params)
+            .silent(true)
+            .build()
+            .unwrap();
+        let mut booster = Booster::create(&[&dmat_train, &dmat_test], &params).unwrap();
+
+        let num_rounds = 5;
+        for i in 0..num_rounds {
+            booster.update(&dmat_train, i).expect("update failed");
+        }
+
+        let preds = booster.predict_contributions(&dmat_test).unwrap();
+        let num_samples = dmat_test.num_rows().unwrap();
+        let num_features = dmat_train.num_cols().unwrap();
+        assert_eq!(preds.shape(), &[num_samples, num_features + 1]);
+    }
+
+    #[test]
+    fn predict_interactions() {
+        let dmat_train = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true).unwrap();
+        let dmat_test = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.test", true).unwrap();
+
+        let tree_params = tree::TreeBoosterParametersBuilder::default()
+            .max_depth(2)
+            .eta(1.0)
+            .build()
+            .unwrap();
+        let learning_params = learning::LearningTaskParametersBuilder::default()
+            .objective(learning::Objective::BinaryLogistic)
+            .eval_metrics(learning::Metrics::Custom(vec![learning::EvaluationMetric::LogLoss]))
+            .build()
+            .unwrap();
+        let params = parameters::ParametersBuilder::default()
+            .booster_params(parameters::booster::BoosterParameters::GbTree(tree_params))
+            .learning_params(learning_params)
+            .silent(true)
+            .build()
+            .unwrap();
+        let mut booster = Booster::create(&[&dmat_train, &dmat_test], &params).unwrap();
+
+        let num_rounds = 5;
+        for i in 0..num_rounds {
+            booster.update(&dmat_train, i).expect("update failed");
+        }
+
+        let preds = booster.predict_interactions(&dmat_test).unwrap();
+        let num_samples = dmat_test.num_rows().unwrap();
+        let num_features = dmat_train.num_cols().unwrap();
+        assert_eq!(preds.shape(), &[num_samples, num_features + 1, num_features + 1]);
     }
 
     #[test]

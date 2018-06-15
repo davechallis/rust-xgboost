@@ -6,3 +6,4 @@ publish = false
 
 [dependencies]
 xgboost = { path = "../../" }
+sprs = "0.6"
