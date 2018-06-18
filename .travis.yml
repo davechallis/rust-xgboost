@@ -18,3 +18,4 @@ script:
   - cd xgboost-sys && cargo test --verbose --all
   - cd .. && cargo test --verbose --all
   - cd examples/basic && cargo run
+  - cd ../custom_objective && cargo run
