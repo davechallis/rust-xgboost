@@ -1,8 +1,6 @@
 extern crate xgboost;
 extern crate ndarray;
 
-use std::io::{BufRead, BufReader};
-use std::fs::File;
 use xgboost::{parameters, dmatrix::DMatrix, booster::Booster};
 
 fn main() {
@@ -17,11 +15,26 @@ fn main() {
         preds.map_inplace(|x| *x = (-*x).exp());
         preds = 1.0 / (1.0 + preds);
 
-        let labels: ndarray::Array1<f32> = ndarray::Array1::from_vec(dtrain.get_labels().unwrap().to_vec());
+        let labels = ndarray::Array1::from_vec(dtrain.get_labels().unwrap().to_vec());
         let gradient = &preds - &labels;
         let hessian = &preds * &(1.0 - &preds);
 
         (gradient.to_vec(), hessian.to_vec())
+    }
+
+    // Custom evaluation function
+    fn eval_error(preds: &[f32], dtrain: &DMatrix) -> f32 {
+        // return 'error', float(sum(labels != (preds > 0.0))) / len(labels)
+        let labels = ndarray::Array1::from_vec(dtrain.get_labels().unwrap().to_vec());
+        let preds = ndarray::Array1::from_vec(preds.to_vec());
+        let mut num_correct = 0;
+        for (label, pred) in labels.iter().zip(preds.iter()) {
+            let pred = if *pred > 0.0 { 1.0 } else { 0.0 };
+            if pred == *label  {
+                num_correct += 1;
+            }
+        }
+        num_correct as f32 / labels.len() as f32
     }
 
     // Configure objectives, metrics, etc.

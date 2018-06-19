@@ -28,7 +28,6 @@ impl Clone for Objective {
     fn clone(&self) -> Self { *self }
 }
 
-
 impl ToString for Objective {
     fn to_string(&self) -> String {
         match *self {
@@ -65,6 +64,8 @@ pub enum Metrics {
     /// Use custom list of metrics.
     Custom(Vec<EvaluationMetric>),
 }
+
+type CustomEvaluationMetric = fn(&[f32], &DMatrix) -> f32;
 
 #[derive(Clone)]
 pub enum EvaluationMetric {
@@ -132,6 +133,8 @@ pub enum EvaluationMetric {
 
     /// Negative log likelihood for Tweedie regression (at a specified value of the tweedie_variance_power parameter).
     TweedieLogLoss,
+
+    Custom(String, CustomEvaluationMetric),
 }
 
 impl ToString for EvaluationMetric {
@@ -148,21 +151,22 @@ impl ToString for EvaluationMetric {
                 }
             },
             EvaluationMetric::MultiClassErrorRate => "merror".to_owned(),
-            EvaluationMetric::MultiClassLogLoss => "mlogloss".to_owned(),
-            EvaluationMetric::AUC => "auc".to_owned(),
-            EvaluationMetric::NDCG => "ndcg".to_owned(),
-            EvaluationMetric::NDCGCut(n) => format!("ndcg@{}", n),
-            EvaluationMetric::NDCGNegative => "ndcg-".to_owned(),
-            EvaluationMetric::NDCGCutNegative(n) => format!("ndcg@{}-", n),
-            EvaluationMetric::MAP => "map".to_owned(),
-            EvaluationMetric::MAPCut(n) => format!("map@{}", n),
-            EvaluationMetric::MAPNegative => "map-".to_owned(),
-            EvaluationMetric::MAPCutNegative(n) => format!("map@{}-", n),
-            EvaluationMetric::PoissonLogLoss => "poisson-nloglik".to_owned(),
-            EvaluationMetric::GammaLogLoss => "gamma-nloglik".to_owned(),
-            EvaluationMetric::CoxLogLoss => "cox-nloglik".to_owned(),
-            EvaluationMetric::GammaDeviance => "gamma-deviance".to_owned(),
-            EvaluationMetric::TweedieLogLoss => "tweedie-nloglik".to_owned(),
+            EvaluationMetric::MultiClassLogLoss   => "mlogloss".to_owned(),
+            EvaluationMetric::AUC                 => "auc".to_owned(),
+            EvaluationMetric::NDCG                => "ndcg".to_owned(),
+            EvaluationMetric::NDCGCut(n)          => format!("ndcg@{}", n),
+            EvaluationMetric::NDCGNegative        => "ndcg-".to_owned(),
+            EvaluationMetric::NDCGCutNegative(n)  => format!("ndcg@{}-", n),
+            EvaluationMetric::MAP                 => "map".to_owned(),
+            EvaluationMetric::MAPCut(n)           => format!("map@{}", n),
+            EvaluationMetric::MAPNegative         => "map-".to_owned(),
+            EvaluationMetric::MAPCutNegative(n)   => format!("map@{}-", n),
+            EvaluationMetric::PoissonLogLoss      => "poisson-nloglik".to_owned(),
+            EvaluationMetric::GammaLogLoss        => "gamma-nloglik".to_owned(),
+            EvaluationMetric::CoxLogLoss          => "cox-nloglik".to_owned(),
+            EvaluationMetric::GammaDeviance       => "gamma-deviance".to_owned(),
+            EvaluationMetric::TweedieLogLoss      => "tweedie-nloglik".to_owned(),
+            EvaluationMetric::Custom(_, _)        => panic!("to_string should never be called for Custom"),
         }
     }
 }
@@ -204,7 +208,10 @@ impl LearningTaskParameters {
 
         if let Metrics::Custom(eval_metrics) = &self.eval_metrics {
             for metric in eval_metrics {
-                v.push(("eval_metric".to_owned(), metric.to_string()));
+                match metric {
+                    EvaluationMetric::Custom(_, _) => (),
+                    metric                         => v.push(("eval_metric".to_owned(), metric.to_string())),
+                }
             }
         }
 

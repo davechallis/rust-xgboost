@@ -1,4 +1,5 @@
-use std::{slice, ffi, ptr};
+use libc;
+use std::{mem, slice, ffi, ptr};
 use std::collections::HashMap;
 use std::path::Path;
 use error::XGBError;
@@ -91,6 +92,8 @@ impl Booster {
             if !eval_sets.is_empty() {
                 let eval = bst.eval_set(eval_sets, i)?;
                 println!("{}", eval);
+
+                // TODO: check if custom eval in params, and execute here
             }
         }
 
@@ -170,8 +173,6 @@ impl Booster {
 
         let mut s: Vec<xgboost_sys::DMatrixHandle> = dmats.iter().map(|x| x.handle).collect();
 
-        use libc;
-        use std::mem;
         let mut evnames: Vec<*const libc::c_char> = {
             let mut evnames = Vec::new();
             for name in names {
