@@ -10,7 +10,7 @@ use xgboost_sys;
 
 use super::XGBResult;
 use parameters::Parameters;
-use parameters::learning::Objective;
+use parameters::learning::{Objective, EvaluationMetric, Metrics};
 use utils::cstring_from_path;
 
 enum PredictOption {
@@ -71,6 +71,18 @@ impl Booster {
         let start_iteration = version / 2;
         let mut nboost = start_iteration;
 
+        let custom_eval_funcs = {
+            let mut eval_funcs = Vec::new();
+            if let Metrics::Custom(ref eval_metrics) = params.learning_params.eval_metrics {
+                for eval_metric in eval_metrics {
+                    if let EvaluationMetric::Custom(name, eval_func) = eval_metric {
+                        eval_funcs.push((name, eval_func));
+                    }
+                }
+            }
+            eval_funcs
+        };
+
         for i in start_iteration..num_boost_round as i32 {
             // distributed code: need to resume to this point
             // skip first update if a recovery step
@@ -94,6 +106,15 @@ impl Booster {
                 println!("{}", eval);
 
                 // TODO: check if custom eval in params, and execute here
+                if !custom_eval_funcs.is_empty() {
+                    for (dmat, dmat_name) in eval_sets {
+                        let margin = bst.predict_margin(dmat)?;
+                        for (eval_name, eval_func) in &custom_eval_funcs {
+                            let eval_result = eval_func(&margin.as_slice().unwrap(), dmat);
+                            println!("[{}]\t{}-{}:{}", i, dmat_name, eval_name, eval_result);
+                        }
+                    }
+                }
             }
         }
 
@@ -218,6 +239,25 @@ impl Booster {
     /// Returns an array containing one entry per row in the given data.
     pub fn predict(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array1<f32>> {
         let option_mask = PredictOption::options_as_mask(&[]);
+        let ntree_limit = 0;
+        let mut out_len = 0;
+        let mut out_result = ptr::null();
+        xgb_call!(xgboost_sys::XGBoosterPredict(self.handle,
+                                                dmat.handle,
+                                                option_mask,
+                                                ntree_limit,
+                                                &mut out_len,
+                                                &mut out_result))?;
+
+        let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
+        Ok(ndarray::Array1::from_vec(s))
+    }
+
+    /// Predict margin for given data.
+    ///
+    /// Returns an array containing one entry per row in the given data.
+    pub fn predict_margin(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array1<f32>> {
+        let option_mask = PredictOption::options_as_mask(&[PredictOption::OutputMargin]);
         let ntree_limit = 0;
         let mut out_len = 0;
         let mut out_result = ptr::null();

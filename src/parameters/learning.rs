@@ -180,7 +180,7 @@ impl ToString for EvaluationMetric {
 pub struct LearningTaskParameters {
     pub(crate) objective: Objective,
     base_score: f32,
-    eval_metrics: Metrics,
+    pub(crate) eval_metrics: Metrics,
     seed: u64,
 }
 

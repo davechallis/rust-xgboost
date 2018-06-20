@@ -1,7 +1,7 @@
 extern crate xgboost;
 extern crate ndarray;
 
-use xgboost::{parameters, dmatrix::DMatrix, booster::Booster};
+use xgboost::{parameters, parameters::learning::EvaluationMetric, dmatrix::DMatrix, booster::Booster};
 
 fn main() {
     // Load train and test matrices from text files (in LibSVM format).
@@ -25,21 +25,24 @@ fn main() {
     // Custom evaluation function
     fn eval_error(preds: &[f32], dtrain: &DMatrix) -> f32 {
         // return 'error', float(sum(labels != (preds > 0.0))) / len(labels)
-        let labels = ndarray::Array1::from_vec(dtrain.get_labels().unwrap().to_vec());
+        let labels = dtrain.get_labels().unwrap();
         let preds = ndarray::Array1::from_vec(preds.to_vec());
-        let mut num_correct = 0;
+        let mut num_incorrect = 0;
         for (label, pred) in labels.iter().zip(preds.iter()) {
             let pred = if *pred > 0.0 { 1.0 } else { 0.0 };
-            if pred == *label  {
-                num_correct += 1;
+            if pred != *label  {
+                num_incorrect += 1;
             }
         }
-        num_correct as f32 / labels.len() as f32
+        num_incorrect as f32 / labels.len() as f32
     }
+
+    let custom_metric = EvaluationMetric::Custom("error".to_string(), eval_error);
 
     // Configure objectives, metrics, etc.
     let learning_params = parameters::learning::LearningTaskParametersBuilder::default()
         .objective(parameters::learning::Objective::Custom(log_reg_obj))
+        .eval_metrics(parameters::learning::Metrics::Custom(vec![custom_metric, EvaluationMetric::RMSE]))
         .build().unwrap();
 
     // Configure booster to use tree model, and configure tree parameters.
