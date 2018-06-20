@@ -24,7 +24,6 @@ fn main() {
 
     // Custom evaluation function
     fn eval_error(preds: &[f32], dtrain: &DMatrix) -> f32 {
-        // return 'error', float(sum(labels != (preds > 0.0))) / len(labels)
         let labels = dtrain.get_labels().unwrap();
         let preds = ndarray::Array1::from_vec(preds.to_vec());
         let mut num_incorrect = 0;
