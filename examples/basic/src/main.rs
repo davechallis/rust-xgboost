@@ -114,6 +114,6 @@ fn main() {
 
     let indices: Vec<u32> = csr_mat.indices().into_iter().map(|i| *i as u32).collect();
     let mut dtrain = DMatrix::from_csr(csr_mat.indptr(), &indices, csr_mat.data(), None).unwrap();
-    dtrain.set_labels(&labels);
+    dtrain.set_labels(&labels).unwrap();
     let bst = Booster::train(&params, &dtrain, num_round, &evaluation_sets).unwrap();
 }

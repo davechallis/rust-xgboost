@@ -1,6 +1,6 @@
 use libc;
 use std::{mem, slice, ffi, ptr};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::Path;
 use error::XGBError;
 use dmatrix::DMatrix;
@@ -17,7 +17,7 @@ enum PredictOption {
     OutputMargin,
     PredictLeaf,
     PredictContribitions,
-    ApproximateContributions,
+    //ApproximateContributions,
     PredictInteractions,
 }
 
@@ -29,7 +29,7 @@ impl PredictOption {
                 PredictOption::OutputMargin => 0x01,
                 PredictOption::PredictLeaf => 0x02,
                 PredictOption::PredictContribitions => 0x04,
-                PredictOption::ApproximateContributions => 0x08,
+                //PredictOption::ApproximateContributions => 0x08,
                 PredictOption::PredictInteractions => 0x10,
             };
             option_mask |= value;
@@ -102,19 +102,35 @@ impl Booster {
             nboost += 1;
 
             if !eval_sets.is_empty() {
-                let eval = bst.eval_set(eval_sets, i)?;
-                println!("{}", eval);
+                let mut dmat_eval_results = bst.eval_set(eval_sets, i)?;
 
-                // TODO: check if custom eval in params, and execute here
                 if !custom_eval_funcs.is_empty() {
                     for (dmat, dmat_name) in eval_sets {
                         let margin = bst.predict_margin(dmat)?;
                         for (eval_name, eval_func) in &custom_eval_funcs {
                             let eval_result = eval_func(&margin.as_slice().unwrap(), dmat);
-                            println!("[{}]\t{}-{}:{}", i, dmat_name, eval_name, eval_result);
+                            let mut eval_results = dmat_eval_results.entry(dmat_name.to_string()).or_insert_with(BTreeMap::new);
+                            eval_results.insert(eval_name.to_string(), eval_result);
                         }
                     }
                 }
+
+                // convert to map of eval_name -> (dmat_name -> score)
+                let mut eval_dmat_results = BTreeMap::new();
+                for (dmat_name, eval_results) in &dmat_eval_results {
+                    for (eval_name, result) in eval_results {
+                        let mut dmat_results = eval_dmat_results.entry(eval_name).or_insert_with(BTreeMap::new);
+                        dmat_results.insert(dmat_name, result);
+                    }
+                }
+
+                print!("[{}]", i);
+                for (eval_name, dmat_results) in eval_dmat_results {
+                    for (dmat_name, result) in dmat_results {
+                        print!("\t{}-{}:{}", dmat_name, eval_name, result);
+                    }
+                }
+                println!();
             }
         }
 
@@ -179,14 +195,14 @@ impl Booster {
     }
 
     // TODO: cleaner to just accept a single DMatrix, no names, no iteration, and parse/return results
-    // in some structured format? E.g. HashMap<String, f32>?
-    fn eval_set(&self, evals: &[(&DMatrix, &str)], iteration: i32) -> XGBResult<String> {
+    // in some structured format? E.g. BTreeMap<String, f32>?
+    fn eval_set(&self, evals: &[(&DMatrix, &str)], iteration: i32) -> XGBResult<BTreeMap<String, BTreeMap<String, f32>>> {
         let (dmats, names) = {
             let mut dmats = Vec::with_capacity(evals.len());
             let mut names = Vec::with_capacity(evals.len());
             for (dmat, name) in evals {
                 dmats.push(dmat);
-                names.push(name);
+                names.push(*name);
             }
             (dmats, names)
         };
@@ -196,7 +212,7 @@ impl Booster {
 
         let mut evnames: Vec<*const libc::c_char> = {
             let mut evnames = Vec::new();
-            for name in names {
+            for name in &names {
                 let cstr = ffi::CString::new(*name).unwrap();
                 evnames.push(cstr.as_ptr());
                 mem::forget(cstr);
@@ -212,14 +228,14 @@ impl Booster {
                                                     dmats.len() as u64,
                                                     &mut out_result))?;
         let out = unsafe { ffi::CStr::from_ptr(out_result).to_str().unwrap().to_owned() };
-        Ok(out)
+        Ok(Booster::parse_eval_string(&out, &names))
     }
 
     /// Evaluate given matrix against
-    pub fn evaluate(&self, dmat: &DMatrix) -> XGBResult<HashMap<String, f32>> {
+    pub fn evaluate(&self, dmat: &DMatrix) -> XGBResult<BTreeMap<String, f32>> {
         let name = "default";
-        let eval = self.eval_set(&[(dmat, name)], 0)?;
-        Ok(Booster::parse_eval_string(&eval, &[name]).remove(name).unwrap())
+        let mut eval = self.eval_set(&[(dmat, name)], 0)?;
+        Ok(eval.remove(name).unwrap())
     }
 
     fn get_attribute_names(&self) -> XGBResult<Vec<String>> {
@@ -387,8 +403,8 @@ impl Booster {
         xgb_call!(xgboost_sys::XGBoosterSetParam(self.handle, name.as_ptr(), value.as_ptr()))
     }
 
-    fn parse_eval_string(eval: &str, evnames: &[&str]) -> HashMap<String, HashMap<String, f32>> {
-        let mut result: HashMap<String, HashMap<String, f32>> = HashMap::new();
+    fn parse_eval_string(eval: &str, evnames: &[&str]) -> BTreeMap<String, BTreeMap<String, f32>> {
+        let mut result: BTreeMap<String, BTreeMap<String, f32>> = BTreeMap::new();
 
         for part in eval.split('\t').skip(1) {
             for evname in evnames {
@@ -399,7 +415,7 @@ impl Booster {
                     let score = metric_parts[1].parse::<f32>()
                         .expect(&format!("Unable to parse XGBoost metrics output: {}", eval));
 
-                    let mut metric_map = result.entry(evname.to_string()).or_insert_with(HashMap::new);
+                    let mut metric_map = result.entry(evname.to_string()).or_insert_with(BTreeMap::new);
                     metric_map.insert(metric.to_owned(), score);
                 }
             }
@@ -652,13 +668,13 @@ mod tests {
     #[test]
     fn parse_eval_string() {
         let s = "[0]\ttrain-map@4-:0.5\ttrain-logloss:1.0\ttest-map@4-:0.25\ttest-logloss:0.75";
-        let mut metrics = HashMap::new();
+        let mut metrics = BTreeMap::new();
 
-        let mut train_metrics = HashMap::new();
+        let mut train_metrics = BTreeMap::new();
         train_metrics.insert("map@4-".to_owned(), 0.5);
         train_metrics.insert("logloss".to_owned(), 1.0);
 
-        let mut test_metrics = HashMap::new();
+        let mut test_metrics = BTreeMap::new();
         test_metrics.insert("map@4-".to_owned(), 0.25);
         test_metrics.insert("logloss".to_owned(), 0.75);
 
