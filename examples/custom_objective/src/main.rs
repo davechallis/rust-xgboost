@@ -53,8 +53,6 @@ fn main() {
     );
 
     // Overall configuration for XGBoost.
-    //
-    // Note: for customised objective function, leave objectives as default.
     let params = parameters::ParametersBuilder::default()
         .learning_params(learning_params)
         .booster_params(booster_params)
