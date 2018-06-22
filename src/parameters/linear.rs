@@ -31,14 +31,14 @@ pub struct LinearBoosterParameters {
     /// L2 regularization term on weights, increase this value will make model more conservative.
     /// Normalised to number of training examples.
     ///
-    /// * default: 0
-    lambda: u32,
+    /// * default: 0.0
+    lambda: f32,
 
     /// L1 egularization term on weights, increase this value will make model more conservative.
     /// Normalised to number of training examples.
     ///
-    /// * default: 0
-    alpha: u32,
+    /// * default: 0.0
+    alpha: f32,
 
     /// Linear model algorithm.
     ///
@@ -46,9 +46,12 @@ pub struct LinearBoosterParameters {
     updater: LinearUpdate,
 }
 
+
 impl LinearBoosterParameters {
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
         let mut v = Vec::new();
+
+        v.push(("booster".to_owned(), "gblinear".to_owned()));
 
         v.push(("lambda".to_owned(), self.lambda.to_string()));
         v.push(("alpha".to_owned(), self.alpha.to_string()));
@@ -61,8 +64,8 @@ impl LinearBoosterParameters {
 impl Default for LinearBoosterParameters {
     fn default() -> Self {
         LinearBoosterParameters {
-            lambda: 0,
-            alpha: 0,
+            lambda: 0.0,
+            alpha: 0.0,
             updater: LinearUpdate::default(),
         }
     }

@@ -95,6 +95,8 @@ impl DartBoosterParameters {
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
         let mut v = Vec::new();
 
+        v.push(("booster".to_owned(), "dart".to_owned()));
+
         v.push(("sample_type".to_owned(), self.sample_type.to_string()));
         v.push(("normalize_type".to_owned(), self.normalize_type.to_string()));
         v.push(("rate_drop".to_owned(), self.rate_drop.to_string()));

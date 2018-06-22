@@ -333,6 +333,8 @@ impl TreeBoosterParameters {
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
         let mut v = Vec::new();
 
+        v.push(("booster".to_owned(), "gbtree".to_owned()));
+
         v.push(("eta".to_owned(), self.eta.to_string()));
         v.push(("gamma".to_owned(), self.gamma.to_string()));
         v.push(("max_depth".to_owned(), self.max_depth.to_string()));

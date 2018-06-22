@@ -19,3 +19,4 @@ script:
   - cd .. && cargo test --verbose --all
   - cd examples/basic && cargo run
   - cd ../custom_objective && cargo run
+  - cd ../generalised_linear_model && cargo run

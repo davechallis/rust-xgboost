@@ -171,6 +171,7 @@ impl Booster {
 
     pub fn set_params(&mut self, p: &Parameters) -> XGBResult<()> {
         for (key, value) in p.as_string_pairs() {
+            debug!("Setting parameter: {}={}", &key, &value);
             self.set_param(&key, &value)?;
         }
         Ok(())
