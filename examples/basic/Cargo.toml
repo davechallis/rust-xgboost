@@ -7,3 +7,5 @@ publish = false
 [dependencies]
 xgboost = { path = "../../" }
 sprs = "0.6"
+log = "0.4"
+env_logger = "0.5"

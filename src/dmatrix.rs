@@ -27,13 +27,16 @@ impl DMatrix {
         xgb_call!(xgboost_sys::XGDMatrixNumCol(handle, &mut out))?;
         let num_cols = out as usize;
 
+        info!("Loaded DMatrix with shape: {}x{}", num_rows, num_cols);
         Ok(DMatrix { handle, num_rows, num_cols })
     }
 
     /// Create a new `DMatrix` from given file (LibSVM or binary format).
-    pub fn load<P: AsRef<Path>>(path: P, silent: bool) -> XGBResult<Self> {
+    pub fn load<P: AsRef<Path>>(path: P) -> XGBResult<Self> {
+        debug!("Loading DMatrix from: {}", path.as_ref().display());
         let mut handle = ptr::null_mut();
         let fname = utils::cstring_from_path(path)?;
+        let silent = true;
         xgb_call!(xgboost_sys::XGDMatrixCreateFromFile(fname.as_ptr(), silent as i32, &mut handle))?;
         Ok(DMatrix::new(handle)?)
     }
@@ -192,7 +195,7 @@ mod tests {
     extern crate tempdir;
     use super::*;
     fn read_train_matrix() -> XGBResult<DMatrix> {
-        DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train", true)
+        DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train")
     }
 
     #[test]
@@ -218,7 +221,7 @@ mod tests {
         let out_path = tmp_dir.path().join("dmat.bin");
         dmat.save(&out_path, true).unwrap();
 
-        let dmat2 = DMatrix::load(&out_path, true).unwrap();
+        let dmat2 = DMatrix::load(&out_path).unwrap();
 
         assert_eq!(dmat.num_rows(), dmat2.num_rows());
         assert_eq!(dmat.num_cols(), dmat2.num_cols());

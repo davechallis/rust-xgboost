@@ -6,8 +6,8 @@ use xgboost::{parameters, parameters::learning::EvaluationMetric, dmatrix::DMatr
 fn main() {
     // Load train and test matrices from text files (in LibSVM format).
     println!("Custom objective example...");
-    let dtrain = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.train", false).unwrap();
-    let dtest = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.test", false).unwrap();
+    let dtrain = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap();
+    let dtest = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.test").unwrap();
 
     // Custom objective function
     fn log_reg_obj(preds: &[f32], dtrain: &DMatrix) -> (Vec<f32>, Vec<f32>) {

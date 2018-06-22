@@ -1,16 +1,20 @@
 extern crate xgboost;
 extern crate sprs;
+extern crate env_logger;
 
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use xgboost::{parameters, dmatrix::DMatrix, booster::Booster};
 
 fn main() {
+    // Initialise logging, run with e.g. RUST_LOG=xgboost=debug to see more details
+    env_logger::init();
+
     // Load train and test matrices from text files (in LibSVM format).
     println!("Loading train and test matrices...");
-    let dtrain = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.train", false).unwrap();
+    let dtrain = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap();
     println!("Train matrix: {}x{}", dtrain.num_rows(), dtrain.num_cols());
-    let dtest = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.test", false).unwrap();
+    let dtest = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.test").unwrap();
     println!("Test matrix: {}x{}", dtest.num_rows(), dtest.num_cols());
 
     // Configure booster to use tree model, and configure tree parameters.
@@ -49,7 +53,7 @@ fn main() {
     // Get predicted labels for each test example (i.e. 0 or 1).
     println!("\nChecking predictions...");
     let labels = dtest.get_labels().unwrap();
-    println!("First 3 predicated labels: {} {} {}", labels[0], labels[1], labels[2]);
+    println!("First 3 predicted labels: {} {} {}", labels[0], labels[1], labels[2]);
 
     // Print error rate.
     let num_correct: usize = preds.iter()
@@ -67,7 +71,7 @@ fn main() {
     // Save and load data matrix file.
     println!("\nSaving and loading matrix data...");
     dtest.save("test.dmat", false).unwrap();
-    let dtest2 = DMatrix::load("test.dmat", false).unwrap();
+    let dtest2 = DMatrix::load("test.dmat").unwrap();
     assert_eq!(bst.predict(&dtest2).unwrap(), preds);
 
     // Error handling example.
