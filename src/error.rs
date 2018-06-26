@@ -15,8 +15,8 @@ pub struct XGBError {
 }
 
 impl XGBError {
-    pub fn new(desc: &str) -> Self {
-        XGBError { desc: desc.to_owned() }
+    pub fn new<S: Into<String>>(desc: S) -> Self {
+        XGBError { desc: desc.into() }
     }
 
     /// Check the return value from an XGBoost FFI call, and return the last error message on

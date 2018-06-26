@@ -40,6 +40,7 @@ impl PredictOption {
     }
 }
 
+/// This is the core model in XGBoost, containing functions for training, evaluating and predicting.
 pub struct Booster {
     handle: xgboost_sys::BoosterHandle,
 }
@@ -138,18 +139,20 @@ impl Booster {
         Ok(bst)
     }
 
+    /// Save this Booster model as a binary file at given path.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> XGBResult<()> {
         debug!("Writing Booster to: {}", path.as_ref().display());
         let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
         xgb_call!(xgboost_sys::XGBoosterSaveModel(self.handle, fname.as_ptr()))
     }
 
+    /// Load a Booster model from a binary file at given path.
     pub fn load<P: AsRef<Path>>(path: P) -> XGBResult<Self> {
         debug!("Loading Booster from: {}", path.as_ref().display());
 
         // gives more control over error messages, avoids stack trace dump from C++
         if !path.as_ref().exists() {
-            return Err(XGBError::new(&format!("File not found: {}", path.as_ref().display())));
+            return Err(XGBError::new(format!("File not found: {}", path.as_ref().display())));
         }
 
         let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
@@ -159,6 +162,7 @@ impl Booster {
         Ok(Booster { handle })
     }
 
+    // TODO: find out what cached matrices do here
     pub fn create(dmats: &[&DMatrix], params: &Parameters) -> XGBResult<Self> {
         let mut handle = ptr::null_mut();
         // TODO: check this is safe, if any dmats are freed
@@ -183,7 +187,11 @@ impl Booster {
     }
 
     pub fn boost(&mut self, dtrain: &DMatrix, grad: &[f32], hess: &[f32]) -> XGBResult<()> {
-        // TODO: error handling
+        if grad.len() != hess.len() {
+            let msg = format!("Mismatch between length of gradient and hessian arrays ({} != {})",
+                              grad.len(), hess.len());
+            return Err(XGBError::new(msg));
+        }
         assert_eq!(grad.len(), hess.len());
 
         // TODO: _validate_feature_names
