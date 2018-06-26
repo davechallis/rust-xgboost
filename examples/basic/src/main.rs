@@ -70,7 +70,7 @@ fn main() {
 
     // Save and load data matrix file.
     println!("\nSaving and loading matrix data...");
-    dtest.save("test.dmat", false).unwrap();
+    dtest.save("test.dmat").unwrap();
     let dtest2 = DMatrix::load("test.dmat").unwrap();
     assert_eq!(bst.predict(&dtest2).unwrap(), preds);
 

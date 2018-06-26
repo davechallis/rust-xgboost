@@ -11,7 +11,12 @@ static KEY_LABEL: &'static str = "label";
 static KEY_WEIGHT: &'static str = "weight";
 static KEY_BASE_MARGIN: &'static str = "base_margin";
 
-/// Data Matrix used in XGBoost.
+/// Data matrix used throughout XGBoost for training/predicting.
+///
+/// Matrix should contain a row for every instance to train/test with, and can optionally contain a `label` (f32 value)
+/// per instance.
+///
+/// Can be created from dense or sparse (CSR or CSC) matrices.
 pub struct DMatrix {
     pub(super) handle: xgboost_sys::DMatrixHandle,
     num_rows: usize,
@@ -19,6 +24,7 @@ pub struct DMatrix {
 }
 
 impl DMatrix {
+    /// Construct a new instance from a DMatrixHandle created by the XGBoost C API.
     fn new(handle: xgboost_sys::DMatrixHandle) -> XGBResult<Self> {
         let mut out = 0;
         xgb_call!(xgboost_sys::XGDMatrixNumRow(handle, &mut out))?;
@@ -32,7 +38,10 @@ impl DMatrix {
         Ok(DMatrix { handle, num_rows, num_cols })
     }
 
-    /// Create a new `DMatrix` from given file (LibSVM or binary format).
+    /// Create a new `DMatrix` from given file.
+    ///
+    /// Supports text files in [LIBSVM](https://www.csie.ntu.edu.tw/~cjlin/libsvm/) format, or
+    /// binary files written either by `save`, or from another XGBoost client.
     pub fn load<P: AsRef<Path>>(path: P) -> XGBResult<Self> {
         debug!("Loading DMatrix from: {}", path.as_ref().display());
         let mut handle = ptr::null_mut();
@@ -88,9 +97,10 @@ impl DMatrix {
     }
 
     /// Serialise this `DMatrix` as a binary file.
-    pub fn save<P: AsRef<Path>>(&self, path: P, silent: bool) -> XGBResult<()> {
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> XGBResult<()> {
         debug!("Writing DMatrix to: {}", path.as_ref().display());
         let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
+        let silent = true;
         xgb_call!(xgboost_sys::XGDMatrixSaveBinary(self.handle, fname.as_ptr(), silent as i32))
     }
 
@@ -227,7 +237,7 @@ mod tests {
 
         let tmp_dir = tempfile::tempdir().expect("failed to create temp dir");
         let out_path = tmp_dir.path().join("dmat.bin");
-        dmat.save(&out_path, true).unwrap();
+        dmat.save(&out_path).unwrap();
 
         let dmat2 = DMatrix::load(&out_path).unwrap();
 
