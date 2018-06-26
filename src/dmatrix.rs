@@ -1,9 +1,10 @@
 use std::{slice, ffi, ptr, path::Path};
 use libc::{c_uint, c_float};
+use std::os::unix::ffi::OsStrExt;
 
 use xgboost_sys;
 
-use super::{XGBResult, XGBError, utils};
+use super::{XGBResult, XGBError};
 
 static KEY_ROOT_INDEX: &'static str = "root_index";
 static KEY_LABEL: &'static str = "label";
@@ -35,12 +36,15 @@ impl DMatrix {
     pub fn load<P: AsRef<Path>>(path: P) -> XGBResult<Self> {
         debug!("Loading DMatrix from: {}", path.as_ref().display());
         let mut handle = ptr::null_mut();
-        let fname = utils::cstring_from_path(path)?;
+        let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
         let silent = true;
         xgb_call!(xgboost_sys::XGDMatrixCreateFromFile(fname.as_ptr(), silent as i32, &mut handle))?;
         Ok(DMatrix::new(handle)?)
     }
 
+    /// Create a new `DMatrix` from a sparse CSR matrix.
+    ///
+    /// If `num_cols` is set to None, number of columns will be inferred from given data.
     pub fn from_csr(indptr: &[usize], indices: &[u32], data: &[f32], num_cols: Option<usize>) -> XGBResult<Self> {
         assert_eq!(indices.len(), data.len());
         let mut handle = ptr::null_mut();
@@ -55,6 +59,9 @@ impl DMatrix {
         Ok(DMatrix::new(handle)?)
     }
 
+    /// Create a new `DMatrix` from a sparse CSC matrix.
+    ///
+    /// If `num_rows` is set to None, number of columns will be inferred from given data.
     pub fn from_csc(indptr: &[usize], indices: &[u32], data: &[f32], num_rows: Option<usize>) -> XGBResult<Self> {
         assert_eq!(indices.len(), data.len());
         let mut handle = ptr::null_mut();
@@ -69,6 +76,7 @@ impl DMatrix {
         Ok(DMatrix::new(handle)?)
     }
 
+    // TODO: can this be simplified? Should it just take an ndarray matrix instead, with missing as a default?
     pub fn from_dense(data: &[f32], num_rows: usize, num_cols: usize, missing: f32) -> XGBResult<Self> {
         let mut handle = ptr::null_mut();
         xgb_call!(xgboost_sys::XGDMatrixCreateFromMat(data.as_ptr(),
@@ -81,7 +89,8 @@ impl DMatrix {
 
     /// Serialise this `DMatrix` as a binary file.
     pub fn save<P: AsRef<Path>>(&self, path: P, silent: bool) -> XGBResult<()> {
-        let fname = utils::cstring_from_path(path)?;
+        debug!("Writing DMatrix to: {}", path.as_ref().display());
+        let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
         xgb_call!(xgboost_sys::XGDMatrixSaveBinary(self.handle, fname.as_ptr(), silent as i32))
     }
 
@@ -103,12 +112,12 @@ impl DMatrix {
         self.set_uint_info(KEY_ROOT_INDEX, array)
     }
 
-    /// Get labels of each instance.
+    /// Get ground truth labels for each row of this matrix.
     pub fn get_labels(&self) -> XGBResult<&[f32]> {
         self.get_float_info(KEY_LABEL)
     }
 
-    /// Set labels of each instance.
+    /// Set ground truth labels for each row of this matrix.
     pub fn set_labels(&mut self, array: &[f32]) -> XGBResult<()> {
         self.set_float_info(KEY_LABEL, array)
     }
@@ -185,14 +194,13 @@ impl DMatrix {
 
 impl Drop for DMatrix {
     fn drop(&mut self) {
-        let _ret_val = unsafe { xgboost_sys::XGDMatrixFree(self.handle) };
-        // TODO: what to do if this fails?
+        xgb_call!(xgboost_sys::XGDMatrixFree(self.handle)).unwrap();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    extern crate tempdir;
+    use tempfile;
     use super::*;
     fn read_train_matrix() -> XGBResult<DMatrix> {
         DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train")
@@ -217,7 +225,7 @@ mod tests {
     fn writing_and_reading() {
         let dmat = read_train_matrix().unwrap();
 
-        let tmp_dir = tempdir::TempDir::new("xgboost-tests").expect("failed to create temp dir");
+        let tmp_dir = tempfile::tempdir().expect("failed to create temp dir");
         let out_path = tmp_dir.path().join("dmat.bin");
         dmat.save(&out_path, true).unwrap();
 

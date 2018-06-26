@@ -6,6 +6,7 @@ extern crate log;
 extern crate ndarray;
 extern crate xgboost_sys;
 extern crate libc;
+extern crate tempfile;
 
 #[macro_use]
 macro_rules! xgb_call {
@@ -16,8 +17,6 @@ macro_rules! xgb_call {
 
 mod error;
 use error::{XGBResult, XGBError};
-
-mod utils;
 
 pub mod dmatrix;
 pub mod booster;

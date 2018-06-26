@@ -1,17 +1,18 @@
 use libc;
-use std::{mem, slice, ffi, ptr};
+use std::{fs::File, io::Write, fmt, mem, slice, ffi, ptr};
 use std::collections::BTreeMap;
 use std::path::Path;
 use error::XGBError;
 use dmatrix::DMatrix;
+use std::os::unix::ffi::OsStrExt;
 
 use ndarray;
 use xgboost_sys;
+use tempfile;
 
 use super::XGBResult;
 use parameters::Parameters;
 use parameters::learning::{Objective, EvaluationMetric, Metrics};
-use utils::cstring_from_path;
 
 enum PredictOption {
     OutputMargin,
@@ -139,7 +140,7 @@ impl Booster {
 
     pub fn save<P: AsRef<Path>>(&self, path: P) -> XGBResult<()> {
         debug!("Writing Booster to: {}", path.as_ref().display());
-        let fname = cstring_from_path(path)?;
+        let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
         xgb_call!(xgboost_sys::XGBoosterSaveModel(self.handle, fname.as_ptr()))
     }
 
@@ -151,7 +152,7 @@ impl Booster {
             return Err(XGBError::new(&format!("File not found: {}", path.as_ref().display())));
         }
 
-        let fname = cstring_from_path(path)?;
+        let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
         let mut handle = ptr::null_mut();
         xgb_call!(xgboost_sys::XGBoosterCreate(ptr::null(), 0, &mut handle))?;
         xgb_call!(xgboost_sys::XGBoosterLoadModel(handle, fname.as_ptr()))?;
@@ -382,6 +383,46 @@ impl Booster {
         Ok(Some(out.to_owned()))
     }
 
+    pub fn dump_model(&self, feature_map: FeatureMap) -> XGBResult<()> {
+        let mut tmp_dir: Option<tempfile::TempDir> = None;
+        let fmap = match feature_map {
+            // empty string tells xgboost to not map any features
+            FeatureMap::None => ffi::CString::new("").unwrap(),
+
+            FeatureMap::File(path) => ffi::CString::new(path.as_os_str().as_bytes()).unwrap(), // FIXME: error handling
+
+            FeatureMap::Features(features) => {
+                let tmp = tempfile::tempdir().unwrap(); // FIXME: error handling
+                let file_path = tmp.path().join("fmap.txt");
+                let mut file = File::create(&file_path).unwrap(); // FIXME: error handling
+                file.write_all(features.to_string().as_bytes()).unwrap(); // FIXME: error handling
+                tmp_dir = Some(tmp);
+                ffi::CString::new(file_path.as_os_str().as_bytes()).unwrap()
+            },
+        };
+        let with_stats = true;
+        let format = ffi::CString::new("text").unwrap();
+        let mut out_len = 0;
+        let mut out_dump_array = ptr::null_mut();
+        xgb_call!(xgboost_sys::XGBoosterDumpModelEx(self.handle,
+                                                    fmap.as_ptr(),
+                                                    with_stats as i32,
+                                                    format.as_ptr(),
+                                                    &mut out_len,
+                                                    &mut out_dump_array))?;
+
+        let out_ptr_slice = unsafe { slice::from_raw_parts(out_dump_array, out_len as usize) };
+        let out_vec: Vec<String> = out_ptr_slice.iter()
+            .map(|str_ptr| unsafe { ffi::CStr::from_ptr(*str_ptr).to_str().unwrap().to_owned() })
+            .collect();
+
+        assert_eq!(out_len as usize, out_vec.len());
+        for s in &out_vec {
+            println!("{}", s);
+        }
+        Ok(())
+    }
+
     pub(crate) fn load_rabit_checkpoint(&self) -> XGBResult<i32> {
         let mut version = 0;
         xgb_call!(xgboost_sys::XGBoosterLoadRabitCheckpoint(self.handle, &mut version))?;
@@ -431,6 +472,78 @@ impl Drop for Booster {
     fn drop(&mut self) {
         xgb_call!(xgboost_sys::XGBoosterFree(self.handle)).unwrap();
     }
+}
+
+/// Indicates the type of a feature.
+pub enum FeatureType {
+    /// Binary indicator feature.
+    Binary,
+
+    /// Quantitative feature (e.g. age, time, etc.), can be missing.
+    Quantitative,
+
+    /// Integer feature (when hinted, decision boundary will be integer).
+    Integer,
+}
+
+impl fmt::Display for FeatureType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let type_str = match *self {
+            FeatureType::Binary => "i",
+            FeatureType::Quantitative => "q",
+            FeatureType::Integer => "int",
+        };
+        write!(f, "{}", type_str)
+    }
+}
+
+
+/// Used to give a name/type to a numerical feature.
+pub struct Feature {
+    feature_type: FeatureType,
+    name: String,
+}
+
+impl Feature {
+    fn new(name: &str, feature_type: FeatureType) -> Self {
+        Feature { name: name.to_owned(), feature_type }
+    }
+
+    fn new_binary(name: &str) -> Self {
+        Feature::new(name, FeatureType::Binary)
+    }
+
+    fn new_quantitative(name: &str) -> Self {
+        Feature::new(name, FeatureType::Quantitative)
+    }
+
+    fn new_integer(name: &str) -> Self {
+        Feature::new(name, FeatureType::Integer)
+    }
+}
+
+impl fmt::Display for Feature {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}\t{}", self.name, self.feature_type)
+    }
+}
+
+pub struct Features(Vec<Feature>);
+
+impl fmt::Display for Features {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, feature) in self.0.iter().enumerate() {
+            write!(f, "{}\t{}", i, feature)?;
+        }
+        Ok(())
+    }
+}
+
+
+pub enum FeatureMap<'a> {
+    File(&'a Path),
+    Features(Features),
+    None,
 }
 
 #[cfg(test)]
@@ -682,5 +795,26 @@ mod tests {
         metrics.insert("train".to_owned(), train_metrics);
         metrics.insert("test".to_owned(), test_metrics);
         assert_eq!(Booster::parse_eval_string(s, &["train", "test"]), metrics);
+    }
+
+    #[test]
+    fn dump_model() {
+        let dmat_train = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap();
+
+        let tree_params = tree::TreeBoosterParametersBuilder::default()
+            .max_depth(2)
+            .eta(1.0)
+            .build().unwrap();
+        let learning_params = learning::LearningTaskParametersBuilder::default()
+            .objective(learning::Objective::BinaryLogistic)
+            .build().unwrap();
+        let params = parameters::ParametersBuilder::default()
+            .booster_params(parameters::booster::BoosterParameters::GbTree(tree_params))
+            .learning_params(learning_params)
+            .silent(true)
+            .build().unwrap();
+        let booster = Booster::train(&params, &dmat_train, 10, &[]).unwrap();
+
+        booster.dump_model(FeatureMap::File(Path::new("xgboost-sys/xgboost/demo/data/featmap.txt")));
     }
 }
