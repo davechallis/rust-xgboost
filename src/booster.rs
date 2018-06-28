@@ -391,23 +391,23 @@ impl Booster {
         Ok(Some(out.to_owned()))
     }
 
-    pub fn dump_model(&self, feature_map: FeatureMap) -> XGBResult<()> {
-        let mut tmp_dir: Option<tempfile::TempDir> = None;
-        let fmap = match feature_map {
-            // empty string tells xgboost to not map any features
-            FeatureMap::None => ffi::CString::new("").unwrap(),
+    pub fn dump_model<I>(&self, feature_map: I) -> XGBResult<()>
+    where
+        I: IntoIterator<Item=(usize, Feature)>
+    {
+        let tmp_dir = tempfile::tempdir().unwrap(); // FIXME: error handling
+        let file_path = tmp_dir.path().join("fmap.txt");
+        let mut file = File::create(&file_path).unwrap(); // FIXME: error handling
+        for (feature_num, feature) in feature_map.into_iter() {
+            let (name, type_indicator) = match feature {
+                Feature::Binary(s) => (s, "i"),
+                Feature::Quantitative(s) => (s, "q"),
+                Feature::Integer(s) => (s, "int"),
+            };
+            write!(file, "{}\t{}\t{}", feature_num, name, type_indicator).unwrap();
+        }
 
-            FeatureMap::File(path) => ffi::CString::new(path.as_os_str().as_bytes()).unwrap(), // FIXME: error handling
-
-            FeatureMap::Features(features) => {
-                let tmp = tempfile::tempdir().unwrap(); // FIXME: error handling
-                let file_path = tmp.path().join("fmap.txt");
-                let mut file = File::create(&file_path).unwrap(); // FIXME: error handling
-                file.write_all(features.to_string().as_bytes()).unwrap(); // FIXME: error handling
-                tmp_dir = Some(tmp);
-                ffi::CString::new(file_path.as_os_str().as_bytes()).unwrap()
-            },
-        };
+        let fmap = ffi::CString::new(file_path.as_os_str().as_bytes()).unwrap();
         let with_stats = true;
         let format = ffi::CString::new("text").unwrap();
         let mut out_len = 0;
@@ -483,79 +483,31 @@ impl Drop for Booster {
 }
 
 /// Indicates the type of a feature.
-pub enum FeatureType {
+pub enum Feature {
     /// Binary indicator feature.
-    Binary,
+    Binary(String),
 
     /// Quantitative feature (e.g. age, time, etc.), can be missing.
-    Quantitative,
+    Quantitative(String),
 
     /// Integer feature (when hinted, decision boundary will be integer).
-    Integer,
-}
-
-impl fmt::Display for FeatureType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let type_str = match *self {
-            FeatureType::Binary => "i",
-            FeatureType::Quantitative => "q",
-            FeatureType::Integer => "int",
-        };
-        write!(f, "{}", type_str)
-    }
-}
-
-
-/// Used to give a name/type to a numerical feature.
-pub struct Feature {
-    feature_type: FeatureType,
-    name: String,
+    Integer(String),
 }
 
 impl Feature {
-    fn new(name: &str, feature_type: FeatureType) -> Self {
-        Feature { name: name.to_owned(), feature_type }
-    }
-
-    fn new_binary(name: &str) -> Self {
-        Feature::new(name, FeatureType::Binary)
-    }
-
-    fn new_quantitative(name: &str) -> Self {
-        Feature::new(name, FeatureType::Quantitative)
-    }
-
-    fn new_integer(name: &str) -> Self {
-        Feature::new(name, FeatureType::Integer)
-    }
-}
-
-impl fmt::Display for Feature {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}\t{}", self.name, self.feature_type)
-    }
-}
-
-pub struct Features(Vec<Feature>);
-
-impl fmt::Display for Features {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, feature) in self.0.iter().enumerate() {
-            write!(f, "{}\t{}", i, feature)?;
+    fn from_type<S: Into<String>>(name: S, feature_type: &str) -> Result<Self, String> {
+        match feature_type {
+            "i"   => Ok(Feature::Binary(name.into())),
+            "q"   => Ok(Feature::Quantitative(name.into())),
+            "int" => Ok(Feature::Integer(name.into())),
+            _     => Err(format!("Unrecognised feature type '{}', must be one of: 'i', 'q', 'int'", feature_type))
         }
-        Ok(())
     }
-}
-
-
-pub enum FeatureMap<'a> {
-    File(&'a Path),
-    Features(Features),
-    None,
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::{BufReader, BufRead};
     use super::*;
     use parameters::{self, learning, tree};
 
@@ -823,6 +775,18 @@ mod tests {
             .build().unwrap();
         let booster = Booster::train(&params, &dmat_train, 10, &[]).unwrap();
 
-        booster.dump_model(FeatureMap::File(Path::new("xgboost-sys/xgboost/demo/data/featmap.txt")));
+        let file = File::open("xgboost-sys/xgboost/demo/data/featmap.txt").expect("failed to open feature map file");
+        let mut reader = BufReader::new(&file);
+        let mut features: Vec<Feature> = Vec::new();
+        for (i, line) in reader.lines().enumerate() {
+            let line = line.unwrap();
+            let parts: Vec<&str> = line.split('\t').collect();
+            let feature_num: usize = parts.get(0).unwrap().parse().unwrap();
+            let feature_name = parts.get(1).unwrap();
+            let feature_type = parts.get(2).unwrap();
+            let feature = Feature::from_type(*feature_name, feature_type).unwrap();
+            assert_eq!(i, features.len());
+            features.push(feature);
+        }
     }
 }
