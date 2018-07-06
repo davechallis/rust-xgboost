@@ -2,6 +2,7 @@ use std::{slice, ffi, ptr, path::Path};
 use libc::{c_uint, c_float};
 use std::os::unix::ffi::OsStrExt;
 
+use ndarray::{self, SliceOrIndex, SliceInfo};
 use xgboost_sys;
 
 use super::{XGBResult, XGBError};
@@ -112,6 +113,10 @@ impl DMatrix {
         self.num_cols
     }
 
+    pub fn shape(&self) -> (usize, usize) {
+        (self.num_rows(), self.num_cols())
+    }
+
     /// Gets the specified root index of each instance, can be used for multi task setting.
     pub fn get_root_index(&self) -> XGBResult<&[u32]> {
         self.get_uint_info(KEY_ROOT_INDEX)
@@ -199,6 +204,22 @@ impl DMatrix {
                                                     field.as_ptr(),
                                                     array.as_ptr(),
                                                     array.len() as u64))
+    }
+
+    fn slice(&self, slice_info: &SliceInfo<[SliceOrIndex; 1], ndarray::Ix1>) -> XGBResult<DMatrix> {
+        // TODO: this is a pretty inefficient way of generating indicies, look into generating from SliceOrIndex
+        let idxs = ndarray::Array::from_iter(0..self.num_rows as i32).slice(slice_info).to_vec();
+        self.slice_from_indices(&idxs)
+    }
+
+    fn slice_from_indices(&self, idxset: &[i32]) -> XGBResult<DMatrix> {
+        debug!("Slicing {} rows from DMatrix", idxset.len());
+        let mut out_handle = ptr::null_mut();
+        xgb_call!(xgboost_sys::XGDMatrixSliceDMatrix(self.handle,
+                                                     idxset.as_ptr(),
+                                                     idxset.len() as xgboost_sys::bst_ulong,
+                                                     &mut out_handle))?;
+        Ok(DMatrix::new(out_handle)?)
     }
 }
 
@@ -339,5 +360,35 @@ mod tests {
         let dmat = DMatrix::from_dense(&data, 10, 20, 0.5).unwrap();
         assert_eq!(dmat.num_rows(), 10);
         assert_eq!(dmat.num_cols(), 20);
+    }
+
+    #[test]
+    fn slice_from_indices() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+
+        let dmat = DMatrix::from_dense(&data, 4, 2, 0.0).unwrap();
+        assert_eq!(dmat.shape(), (4, 2));
+
+        assert_eq!(dmat.slice_from_indices(&[]).unwrap().shape(), (0, 2));
+        assert_eq!(dmat.slice_from_indices(&[1]).unwrap().shape(), (1, 2));
+        assert_eq!(dmat.slice_from_indices(&[0, 1]).unwrap().shape(), (2, 2));
+        assert_eq!(dmat.slice_from_indices(&[3, 2, 1]).unwrap().shape(), (3, 2));
+        assert!(dmat.slice_from_indices(&[10, 11, 12]).is_err());
+    }
+
+    #[test]
+    fn slice() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0];
+
+        let dmat = DMatrix::from_dense(&data, 4, 3, 0.0).unwrap();
+        assert_eq!(dmat.shape(), (4, 3));
+
+        assert_eq!(dmat.slice(s![..]).unwrap().shape(), (4, 3));
+        assert_eq!(dmat.slice(s![0..2]).unwrap().shape(), (2, 3));
+        assert_eq!(dmat.slice(s![2..]).unwrap().shape(), (2, 3));
+        assert_eq!(dmat.slice(s![..-1]).unwrap().shape(), (3, 3));
+        assert_eq!(dmat.slice(s![3..1]).unwrap().shape(), (0, 3));
+        assert_eq!(dmat.slice(s![..;2]).unwrap().shape(), (2, 3));
+        assert_eq!(dmat.slice(s![..;-1]).unwrap().shape(), (4, 3));
     }
 }

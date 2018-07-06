@@ -71,7 +71,7 @@ impl Booster {
 
         let rank = unsafe { xgboost_sys::RabitGetRank() };
         let start_iteration = version / 2;
-        let mut nboost = start_iteration;
+        //let mut nboost = start_iteration;
 
         let custom_eval_funcs = {
             let mut eval_funcs = Vec::new();
@@ -101,7 +101,7 @@ impl Booster {
 
             assert!(unsafe { xgboost_sys::RabitGetWorldSize() == 1 || version == xgboost_sys::RabitVersionNumber() });
 
-            nboost += 1;
+            //nboost += 1;
 
             if !eval_sets.is_empty() {
                 let mut dmat_eval_results = bst.eval_set(eval_sets, i)?;
@@ -507,7 +507,7 @@ impl Feature {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{BufReader, BufRead};
+    //use std::io::{BufReader, BufRead};
     use super::*;
     use parameters::{self, learning, tree};
 
@@ -757,36 +757,37 @@ mod tests {
         assert_eq!(Booster::parse_eval_string(s, &["train", "test"]), metrics);
     }
 
-    #[test]
-    fn dump_model() {
-        let dmat_train = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap();
-
-        let tree_params = tree::TreeBoosterParametersBuilder::default()
-            .max_depth(2)
-            .eta(1.0)
-            .build().unwrap();
-        let learning_params = learning::LearningTaskParametersBuilder::default()
-            .objective(learning::Objective::BinaryLogistic)
-            .build().unwrap();
-        let params = parameters::ParametersBuilder::default()
-            .booster_params(parameters::booster::BoosterParameters::GbTree(tree_params))
-            .learning_params(learning_params)
-            .silent(true)
-            .build().unwrap();
-        let booster = Booster::train(&params, &dmat_train, 10, &[]).unwrap();
-
-        let file = File::open("xgboost-sys/xgboost/demo/data/featmap.txt").expect("failed to open feature map file");
-        let mut reader = BufReader::new(&file);
-        let mut features: Vec<Feature> = Vec::new();
-        for (i, line) in reader.lines().enumerate() {
-            let line = line.unwrap();
-            let parts: Vec<&str> = line.split('\t').collect();
-            let feature_num: usize = parts.get(0).unwrap().parse().unwrap();
-            let feature_name = parts.get(1).unwrap();
-            let feature_type = parts.get(2).unwrap();
-            let feature = Feature::from_type(*feature_name, feature_type).unwrap();
-            assert_eq!(i, features.len());
-            features.push(feature);
-        }
-    }
+//    #[test]
+//    fn dump_model() {
+//        let dmat_train = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap();
+//
+//        let tree_params = tree::TreeBoosterParametersBuilder::default()
+//            .max_depth(2)
+//            .eta(1.0)
+//            .build().unwrap();
+//        let learning_params = learning::LearningTaskParametersBuilder::default()
+//            .objective(learning::Objective::BinaryLogistic)
+//            .build().unwrap();
+//        let params = parameters::ParametersBuilder::default()
+//            .booster_params(parameters::booster::BoosterParameters::GbTree(tree_params))
+//            .learning_params(learning_params)
+//            .silent(true)
+//            .build().unwrap();
+//        let booster = Booster::train(&params, &dmat_train, 10, &[]).unwrap();
+//
+//        let file = File::open("xgboost-sys/xgboost/demo/data/featmap.txt")
+//            .expect("failed to open feature map file");
+//        let reader = BufReader::new(&file);
+//        let mut features: Vec<Feature> = Vec::new();
+//        for (i, line) in reader.lines().enumerate() {
+//            let line = line.unwrap();
+//            let parts: Vec<&str> = line.split('\t').collect();
+//            let feature_num: usize = parts.get(0).unwrap().parse().unwrap();
+//            let feature_name = parts.get(1).unwrap();
+//            let feature_type = parts.get(2).unwrap();
+//            let feature = Feature::from_type(*feature_name, feature_type).unwrap();
+//            assert_eq!(i, features.len());
+//            features.push(feature);
+//        }
+//    }
 }
