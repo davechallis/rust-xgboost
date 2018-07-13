@@ -86,13 +86,12 @@ impl DMatrix {
         Ok(DMatrix::new(handle)?)
     }
 
-    // TODO: can this be simplified? Should it just take an ndarray matrix instead, with missing as a default?
-    pub fn from_dense(data: &[f32], num_rows: usize, num_cols: usize, missing: f32) -> XGBResult<Self> {
+    pub fn from_dense(matrix: &ndarray::Array2<f32>) -> XGBResult<Self> {
         let mut handle = ptr::null_mut();
-        xgb_call!(xgboost_sys::XGDMatrixCreateFromMat(data.as_ptr(),
-                                                      num_rows as xgboost_sys::bst_ulong,
-                                                      num_cols as xgboost_sys::bst_ulong,
-                                                      missing,
+        xgb_call!(xgboost_sys::XGDMatrixCreateFromMat(matrix.as_ptr(),
+                                                      matrix.rows() as xgboost_sys::bst_ulong,
+                                                      matrix.cols() as xgboost_sys::bst_ulong,
+                                                      0.0, // TODO: can values be missing here?
                                                       &mut handle))?;
         Ok(DMatrix::new(handle)?)
     }
@@ -206,8 +205,12 @@ impl DMatrix {
                                                     array.len() as u64))
     }
 
-    fn slice(&self, slice_info: &SliceInfo<[SliceOrIndex; 1], ndarray::Ix1>) -> XGBResult<DMatrix> {
-        // TODO: this is a pretty inefficient way of generating indicies, look into generating from SliceOrIndex
+    /// Get a new DMatrix as a slice of this one.
+    ///
+    /// Slicing can be conveniently done using ndarray's [s!](https://docs.rs/ndarray/0.11.2/ndarray/macro.s.html)
+    /// macro.
+    pub fn slice(&self, slice_info: &SliceInfo<[SliceOrIndex; 1], ndarray::Ix1>) -> XGBResult<DMatrix> {
+        // TODO: this is a pretty inefficient way of generating indices, look into generating from SliceOrIndex
         let idxs = ndarray::Array::from_iter(0..self.num_rows as i32).slice(slice_info).to_vec();
         self.slice_from_indices(&idxs)
     }
@@ -347,26 +350,29 @@ mod tests {
 
     #[test]
     fn from_dense() {
-        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+        let data: ndarray::Array2<f32> = ndarray::arr2(&[[1.0, 2.0, 3.0],
+                                                         [4.0, 5.0, 6.0]]);
 
-        let dmat = DMatrix::from_dense(&data, 2, 3, 0.0).unwrap();
+        let dmat = DMatrix::from_dense(&data).unwrap();
         assert_eq!(dmat.num_rows(), 2);
         assert_eq!(dmat.num_cols(), 3);
 
-        let dmat = DMatrix::from_dense(&data, 1, 6, 0.0).unwrap();
-        assert_eq!(dmat.num_rows(), 1);
-        assert_eq!(dmat.num_cols(), 6);
-
-        let dmat = DMatrix::from_dense(&data, 10, 20, 0.5).unwrap();
-        assert_eq!(dmat.num_rows(), 10);
-        assert_eq!(dmat.num_cols(), 20);
+        let data: ndarray::Array2<f32> = ndarray::arr2(&[[1.0],
+                                                         [2.0],
+                                                         [3.0]]);
+        let dmat = DMatrix::from_dense(&data).unwrap();
+        assert_eq!(dmat.num_rows(), 3);
+        assert_eq!(dmat.num_cols(), 1);
     }
 
     #[test]
     fn slice_from_indices() {
-        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let data: ndarray::Array2<f32> = ndarray::arr2(&[[1.0, 2.0],
+                                                         [3.0, 4.0],
+                                                         [5.0, 6.0],
+                                                         [7.0, 8.0]]);
 
-        let dmat = DMatrix::from_dense(&data, 4, 2, 0.0).unwrap();
+        let dmat = DMatrix::from_dense(&data).unwrap();
         assert_eq!(dmat.shape(), (4, 2));
 
         assert_eq!(dmat.slice_from_indices(&[]).unwrap().shape(), (0, 2));
@@ -378,9 +384,12 @@ mod tests {
 
     #[test]
     fn slice() {
-        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0];
+        let data: ndarray::Array2<f32> = ndarray::arr2(&[[1.0, 2.0, 3.0],
+                                                         [4.0, 5.0, 6.0],
+                                                         [7.0, 8.0, 9.0],
+                                                         [10.0, 11.0, 12.0]]);
 
-        let dmat = DMatrix::from_dense(&data, 4, 3, 0.0).unwrap();
+        let dmat = DMatrix::from_dense(&data).unwrap();
         assert_eq!(dmat.shape(), (4, 3));
 
         assert_eq!(dmat.slice(s![..]).unwrap().shape(), (4, 3));

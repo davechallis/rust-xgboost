@@ -1,7 +1,7 @@
 use std::default::Default;
 use dmatrix::DMatrix;
 
-type CustomObjective = fn(&[f32], &DMatrix) -> (Vec<f32>, Vec<f32>);
+pub type CustomObjective = fn(&[f32], &DMatrix) -> (Vec<f32>, Vec<f32>);
 
 pub enum Objective {
     RegLinear,
