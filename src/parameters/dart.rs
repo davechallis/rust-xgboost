@@ -109,8 +109,8 @@ impl DartBoosterParameters {
 
 impl DartBoosterParametersBuilder {
     fn validate(&self) -> Result<(), String> {
-        Interval::new_closed_closed(0.0, 1.0).validate(self.rate_drop, "rate_drop")?;
-        Interval::new_closed_closed(0.0, 1.0).validate(self.skip_drop, "skip_drop")?;
+        Interval::new_closed_closed(0.0, 1.0).validate(&self.rate_drop, "rate_drop")?;
+        Interval::new_closed_closed(0.0, 1.0).validate(&self.skip_drop, "skip_drop")?;
         Ok(())
     }
 }

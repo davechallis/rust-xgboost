@@ -1,3 +1,4 @@
+use std;
 use std::default::Default;
 use dmatrix::DMatrix;
 
@@ -144,7 +145,7 @@ impl ToString for EvaluationMetric {
             EvaluationMetric::MAE => "mae".to_owned(),
             EvaluationMetric::LogLoss => "logloss".to_owned(),
             EvaluationMetric::BinaryErrorRate(t) => {
-                if t == 0.5 {
+                if (t - 0.5).abs() < std::f32::EPSILON {
                     "error".to_owned()
                 } else {
                     format!("error@{}", t)

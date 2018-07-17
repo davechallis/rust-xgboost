@@ -470,7 +470,7 @@ impl Booster {
                 Err(err) => return Err(XGBError::new(err.to_string())),
             };
 
-            for (feature_num, (feature_name, feature_type)) in fmap.0.iter() {
+            for (feature_num, (feature_name, feature_type)) in &fmap.0 {
                 writeln!(file, "{}\t{}\t{}", feature_num, feature_name, feature_type).unwrap();
             }
 
@@ -531,7 +531,7 @@ impl Booster {
                     assert_eq!(metric_parts.len(), 2);
                     let metric = metric_parts[0];
                     let score = metric_parts[1].parse::<f32>()
-                        .expect(&format!("Unable to parse XGBoost metrics output: {}", eval));
+                        .unwrap_or_else(|_| panic!("Unable to parse XGBoost metrics output: {}", eval));
 
                     let mut metric_map = result.entry(evname.to_string()).or_insert_with(BTreeMap::new);
                     metric_map.insert(metric.to_owned(), score);
@@ -566,7 +566,7 @@ impl FeatureMap {
             }
 
             assert_eq!(parts.len(), 3);
-            let feature_num: u32 = match parts.get(0).unwrap().parse() {
+            let feature_num: u32 = match parts[0].parse() {
                 Ok(num)  => num,
                 Err(err) => {
                     let msg = format!("Unable to parse features from line {}, could not parse feature number: {}",
@@ -575,8 +575,8 @@ impl FeatureMap {
                 }
             };
 
-            let feature_name = parts.get(1).unwrap();
-            let feature_type = match FeatureType::from_str(parts.get(2).unwrap()) {
+            let feature_name = &parts[1];
+            let feature_type = match FeatureType::from_str(&parts[2]) {
                 Ok(feature_type) => feature_type,
                 Err(msg)         => {
                     let msg = format!("Unable to parse features from line {}: {}", i+1, msg);

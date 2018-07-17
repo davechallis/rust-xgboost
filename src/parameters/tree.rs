@@ -362,11 +362,11 @@ impl TreeBoosterParameters {
 
 impl TreeBoosterParametersBuilder {
     fn validate(&self) -> Result<(), String> {
-        Interval::new_closed_closed(0.0, 1.0).validate(self.eta, "eta")?;
-        Interval::new_open_closed(0.0, 1.0).validate(self.subsample, "subsample")?;
-        Interval::new_open_closed(0.0, 1.0).validate(self.colsample_bytree, "colsample_bytree")?;
-        Interval::new_open_closed(0.0, 1.0).validate(self.colsample_bylevel, "colsample_bylevel")?;
-        Interval::new_open_open(0.0, 1.0).validate(self.sketch_eps, "sketch_eps")?;
+        Interval::new_closed_closed(0.0, 1.0).validate(&self.eta, "eta")?;
+        Interval::new_open_closed(0.0, 1.0).validate(&self.subsample, "subsample")?;
+        Interval::new_open_closed(0.0, 1.0).validate(&self.colsample_bytree, "colsample_bytree")?;
+        Interval::new_open_closed(0.0, 1.0).validate(&self.colsample_bylevel, "colsample_bylevel")?;
+        Interval::new_open_open(0.0, 1.0).validate(&self.sketch_eps, "sketch_eps")?;
         Ok(())
     }
 }

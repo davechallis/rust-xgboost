@@ -77,7 +77,7 @@ impl Default for TweedieRegressionParameters {
 
 impl TweedieRegressionParametersBuilder {
     fn validate(&self) -> Result<(), String> {
-        Interval::new_open_open(1.0, 2.0).validate(self.tweedie_variance_power, "tweedie_variance_power")?;
+        Interval::new_open_open(1.0, 2.0).validate(&self.tweedie_variance_power, "tweedie_variance_power")?;
         Ok(())
     }
 }
@@ -137,7 +137,7 @@ impl<T: PartialOrd + Display> Interval<T> {
         true
     }
 
-    fn validate(&self, val: Option<T>, name: &str) -> Result<(), String> {
+    fn validate(&self, val: &Option<T>, name: &str) -> Result<(), String> {
         match val {
             Some(ref val) => {
                 if self.contains(&val) {
