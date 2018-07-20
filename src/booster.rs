@@ -8,7 +8,6 @@ use error::XGBError;
 use dmatrix::DMatrix;
 use std::os::unix::ffi::OsStrExt;
 
-use ndarray;
 use xgboost_sys;
 use tempfile;
 
@@ -126,7 +125,7 @@ impl Booster {
                     for (dmat, dmat_name) in eval_sets {
                         let margin = bst.predict_margin(dmat)?;
                         for (eval_name, eval_func) in &custom_eval_funcs {
-                            let eval_result = eval_func(&margin.as_slice().unwrap(), dmat);
+                            let eval_result = eval_func(&margin, dmat);
                             let mut eval_results = dmat_eval_results.entry(dmat_name.to_string()).or_insert_with(BTreeMap::new);
                             eval_results.insert(eval_name.to_string(), eval_result);
                         }
@@ -340,7 +339,7 @@ impl Booster {
     /// Predict results for given data.
     ///
     /// Returns an array containing one entry per row in the given data.
-    pub fn predict(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array1<f32>> {
+    pub fn predict(&self, dmat: &DMatrix) -> XGBResult<Vec<f32>> {
         let option_mask = PredictOption::options_as_mask(&[]);
         let ntree_limit = 0;
         let mut out_len = 0;
@@ -352,14 +351,14 @@ impl Booster {
                                                 &mut out_len,
                                                 &mut out_result))?;
 
-        let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
-        Ok(ndarray::Array1::from_vec(s))
+        let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
+        Ok(data)
     }
 
     /// Predict margin for given data.
     ///
     /// Returns an array containing one entry per row in the given data.
-    pub fn predict_margin(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array1<f32>> {
+    pub fn predict_margin(&self, dmat: &DMatrix) -> XGBResult<Vec<f32>> {
         let option_mask = PredictOption::options_as_mask(&[PredictOption::OutputMargin]);
         let ntree_limit = 0;
         let mut out_len = 0;
@@ -371,16 +370,16 @@ impl Booster {
                                                 &mut out_len,
                                                 &mut out_result))?;
 
-        let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
-        Ok(ndarray::Array1::from_vec(s))
+        let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
+        Ok(data)
     }
 
     /// Get predicted leaf index for each sample in given data.
     ///
-    /// Returns an array of shape (number of samples, number of trees).
+    /// Returns an array of shape (number of samples, number of trees) as tuple of (data, num_rows).
     ///
     /// Note: the leaf index of a tree is unique per tree, so e.g. leaf 1 could be found in both tree 1 and tree 0.
-    pub fn predict_leaf(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array2<f32>> {
+    pub fn predict_leaf(&self, dmat: &DMatrix) -> XGBResult<(Vec<f32>, (usize, usize))> {
         let option_mask = PredictOption::options_as_mask(&[PredictOption::PredictLeaf]);
         let ntree_limit = 0;
         let mut out_len = 0;
@@ -392,11 +391,10 @@ impl Booster {
                                                 &mut out_len,
                                                 &mut out_result))?;
 
-        let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
+        let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         let num_rows = dmat.num_rows();
-
-        // TODO: re-wrap error as XGBResult
-        Ok(ndarray::Array2::from_shape_vec((num_rows, s.len() / num_rows), s).unwrap())
+        let num_cols = data.len() / num_rows;
+        Ok((data, (num_rows, num_cols)))
     }
 
     /// Get feature contributions (SHAP values) for each prediction.
@@ -404,9 +402,9 @@ impl Booster {
     /// The sum of all feature contributions is equal to the run untransformed margin value of the
     /// prediction.
     ///
-    /// Returns an array of shape (number of samples, number of features + 1). The final column contains the
-    /// bias term.
-    pub fn predict_contributions(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array2<f32>> {
+    /// Returns an array of shape (number of samples, number of features + 1) as a tuple of
+    /// (data, num_rows). The final column contains the bias term.
+    pub fn predict_contributions(&self, dmat: &DMatrix) -> XGBResult<(Vec<f32>, (usize, usize))> {
         let option_mask = PredictOption::options_as_mask(&[PredictOption::PredictContribitions]);
         let ntree_limit = 0;
         let mut out_len = 0;
@@ -418,11 +416,10 @@ impl Booster {
                                                 &mut out_len,
                                                 &mut out_result))?;
 
-        let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
+        let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         let num_rows = dmat.num_rows();
-
-        // TODO: re-wrap error as XGBResult
-        Ok(ndarray::Array2::from_shape_vec((num_rows, s.len() / num_rows), s).unwrap())
+        let num_cols = data.len() / num_rows;
+        Ok((data, (num_rows, num_cols)))
     }
 
     /// Get SHAP interaction values for each pair of features for each prediction.
@@ -433,7 +430,7 @@ impl Booster {
     ///
     /// Returns an array of shape (number of samples, number of features + 1, number of features + 1).
     /// The final row and column contain the bias terms.
-    pub fn predict_interactions(&self, dmat: &DMatrix) -> XGBResult<ndarray::Array3<f32>> {
+    pub fn predict_interactions(&self, dmat: &DMatrix) -> XGBResult<(Vec<f32>, (usize, usize, usize))> {
         let option_mask = PredictOption::options_as_mask(&[PredictOption::PredictInteractions]);
         let ntree_limit = 0;
         let mut out_len = 0;
@@ -445,12 +442,11 @@ impl Booster {
                                                 &mut out_len,
                                                 &mut out_result))?;
 
-        let s = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
+        let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         let num_rows = dmat.num_rows();
 
-        // TODO: re-wrap error as XGBResult
-        let dim = ((s.len() / num_rows) as f64).sqrt() as usize;
-        Ok(ndarray::Array3::from_shape_vec((num_rows, dim, dim), s).unwrap())
+        let dim = ((data.len() / num_rows) as f64).sqrt() as usize;
+        Ok((data, (num_rows, dim, dim)))
     }
 
     /// Get a dump of this model as a string.
@@ -752,7 +748,7 @@ mod tests {
             assert!(pred - expected < eps);
         }
 
-        for (pred, expected) in v.slice(s![-10..]).iter().zip(&expected_end) {
+        for (pred, expected) in v[v.len()-10..].iter().zip(&expected_end) {
             println!("predictions={}, expected={}", pred, expected);
             assert!(pred - expected < eps);
         }
@@ -786,9 +782,9 @@ mod tests {
             booster.update(&dmat_train, i).expect("update failed");
         }
 
-        let preds = booster.predict_leaf(&dmat_test).unwrap();
+        let (_preds, shape) = booster.predict_leaf(&dmat_test).unwrap();
         let num_samples = dmat_test.num_rows();
-        assert_eq!(preds.shape(), &[num_samples, num_rounds as usize]);
+        assert_eq!(shape, (num_samples, num_rounds as usize));
     }
 
     #[test]
@@ -819,10 +815,10 @@ mod tests {
             booster.update(&dmat_train, i).expect("update failed");
         }
 
-        let preds = booster.predict_contributions(&dmat_test).unwrap();
+        let (_preds, shape) = booster.predict_contributions(&dmat_test).unwrap();
         let num_samples = dmat_test.num_rows();
         let num_features = dmat_train.num_cols();
-        assert_eq!(preds.shape(), &[num_samples, num_features + 1]);
+        assert_eq!(shape, (num_samples, num_features + 1));
     }
 
     #[test]
@@ -853,10 +849,10 @@ mod tests {
             booster.update(&dmat_train, i).expect("update failed");
         }
 
-        let preds = booster.predict_interactions(&dmat_test).unwrap();
+        let (_preds, shape) = booster.predict_interactions(&dmat_test).unwrap();
         let num_samples = dmat_test.num_rows();
         let num_features = dmat_train.num_cols();
-        assert_eq!(preds.shape(), &[num_samples, num_features + 1, num_features + 1]);
+        assert_eq!(shape, (num_samples, num_features + 1, num_features + 1));
     }
 
     #[test]
