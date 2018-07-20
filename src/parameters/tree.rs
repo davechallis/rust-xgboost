@@ -1,3 +1,6 @@
+//! Parameters for controlling tree boosters.
+//!
+//!
 use std::default::Default;
 
 use super::Interval;

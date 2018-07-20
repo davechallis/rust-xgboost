@@ -48,11 +48,12 @@ fn main() {
 ```
 
 See the [examples](https://github.com/davechallis/rust-xgboost/tree/master/examples) directory for
-demonstration of different features.
+more detailed examples of different features.
 
 ## Status
 
-Currently in a very early stage of development, so the API shouldn't be considered stable yet.
+Currently in a very early stage of development, so the API is changing as usability issues occur,
+or new features are supported.
 
 Builds against XGBoost 0.72.
 

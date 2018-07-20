@@ -1,11 +1,17 @@
-//! Rust wrapper around the [XGBoost](https://xgboost.readthedocs.io/en/latest/) machine learning library.
+//! Rust wrapper around the [XGBoost](https://xgboost.ai) machine learning library.
+//!
+//! Provides a high level interface for training machine learning models using
+//! [gradient boosting](https://en.wikipedia.org/wiki/Gradient_boosting).
+//!
+//! Currently in the early stages of development, API is likely to be fairly unstable as new
+//! features are added.
 //!
 //! # Basic usage example
 //!
 //! ```
 //! extern crate xgboost;
 //!
-//! use xgboost::{parameters, dmatrix::DMatrix, booster::Booster};
+//! use xgboost::{parameters, DMatrix, Booster};
 //!
 //! fn main() {
 //!     // training matrix with 5 training examples and 3 features
@@ -14,17 +20,20 @@
 //!                     1.0, 1.0, 1.0,
 //!                     0.0, 0.0, 0.0,
 //!                     1.0, 1.0, 1.0];
-//!     let x_train_num_rows = 5;
+//!     let num_rows = 5;
 //!     let y_train = &[1.0, 1.0, 1.0, 0.0, 1.0];
 //!
-//!     // convert training data into XGBoost's matrix format, and set ground truth labels
-//!     let mut dtrain = DMatrix::from_dense(x_train, x_train_num_rows).unwrap();
+//!     // convert training data into XGBoost's matrix format
+//!     let mut dtrain = DMatrix::from_dense(x_train, num_rows).unwrap();
+//!
+//!     // set ground truth labels for the training matrix
 //!     dtrain.set_labels(y_train).unwrap();
 //!
+//!     // test matrix with 1 row
 //!     let x_test = &[0.7, 0.9, 0.6];
-//!     let x_test_num_rows = 1;
+//!     let num_rows = 1;
 //!     let y_test = &[1.0];
-//!     let mut dtest = DMatrix::from_dense(x_test, x_test_num_rows).unwrap();
+//!     let mut dtest = DMatrix::from_dense(x_test, num_rows).unwrap();
 //!     dtest.set_labels(y_test).unwrap();
 //!
 //!     // build overall training parameters
@@ -34,16 +43,16 @@
 //!     let evaluation_sets = &[(&dtrain, "train"), (&dtest, "test")];
 //!
 //!     // train model, and print evaluation data
-//!     let bst = Booster::train(&params, &dtrain, 3, evaluation_sets).unwrap();
+//!     let num_rounds = 3;
+//!     let bst = Booster::train(&params, &dtrain, num_rounds, evaluation_sets).unwrap();
 //!
 //!     println!("{:?}", bst.predict(&dtest).unwrap());
 //! }
 //! ```
 //!
-//! # Status
+//! See the [examples](https://github.com/davechallis/rust-xgboost/tree/master/examples) directory for
+//! more detailed examples of different features.
 //!
-//! The crate is still in the early stages of development, so the API is likely to be fairly
-//! unstable.
 #[macro_use]
 extern crate derive_builder;
 #[macro_use]
@@ -60,8 +69,11 @@ macro_rules! xgb_call {
 }
 
 mod error;
-use error::{XGBResult, XGBError};
+pub use error::{XGBResult, XGBError};
 
-pub mod dmatrix;
-pub mod booster;
+mod dmatrix;
+pub use dmatrix::DMatrix;
+
+mod booster;
+pub use booster::{Booster, FeatureMap, FeatureType};
 pub mod parameters;

@@ -43,7 +43,7 @@ impl PredictOption {
     }
 }
 
-/// This is the core model in XGBoost, containing functions for training, evaluating and predicting.
+/// Core model in XGBoost, containing functions for training, evaluating and predicting.
 pub struct Booster {
     handle: xgboost_sys::BoosterHandle,
 }
@@ -351,6 +351,7 @@ impl Booster {
                                                 &mut out_len,
                                                 &mut out_result))?;
 
+        assert!(!out_result.is_null());
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         Ok(data)
     }
@@ -369,6 +370,7 @@ impl Booster {
                                                 ntree_limit,
                                                 &mut out_len,
                                                 &mut out_result))?;
+        assert!(!out_result.is_null());
 
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         Ok(data)
@@ -390,6 +392,7 @@ impl Booster {
                                                 ntree_limit,
                                                 &mut out_len,
                                                 &mut out_result))?;
+        assert!(!out_result.is_null());
 
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         let num_rows = dmat.num_rows();
@@ -415,6 +418,7 @@ impl Booster {
                                                 ntree_limit,
                                                 &mut out_len,
                                                 &mut out_result))?;
+        assert!(!out_result.is_null());
 
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         let num_rows = dmat.num_rows();
@@ -441,6 +445,7 @@ impl Booster {
                                                 ntree_limit,
                                                 &mut out_len,
                                                 &mut out_result))?;
+        assert!(!out_result.is_null());
 
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         let num_rows = dmat.num_rows();
@@ -546,9 +551,31 @@ impl Drop for Booster {
     }
 }
 
+/// Maps a feature index to a name and type, used when dumping models as text.
+///
+/// See [dump_model](struct.Booster.html#method.dump_model) for usage.
 pub struct FeatureMap(BTreeMap<u32, (String, FeatureType)>);
 
 impl FeatureMap {
+    /// Read a `FeatureMap` from a file at given path.
+    ///
+    /// File should contain one feature definition per line, and be of the form:
+    /// ```text
+    /// <number>\t<name>\t<type>\n
+    /// ```
+    ///
+    /// Type should be one of:
+    /// * `i` - binary feature
+    /// * `q` - quantitative feature
+    /// * `int` - integer features
+    ///
+    /// E.g.:
+    /// ```text
+    /// 0   age int
+    /// 1   is-parent?=yes  i
+    /// 2   is-parent?=no   i
+    /// 3   income  int
+    /// ```
     pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<FeatureMap> {
         let file = File::open(path)?;
         let mut features: FeatureMap = FeatureMap(BTreeMap::new());
@@ -586,7 +613,7 @@ impl FeatureMap {
     }
 }
 
-/// Indicates the type of a feature.
+/// Indicates the type of a feature, used when dumping models as text.
 pub enum FeatureType {
     /// Binary indicator feature.
     Binary,

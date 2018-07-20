@@ -7,15 +7,17 @@ use std::error::Error;
 
 use xgboost_sys;
 
+/// Convenience return type for most operations which can return an `XGBError`.
 pub type XGBResult<T> = std::result::Result<T, XGBError>;
 
+/// Wrap errors returned by the XGBoost library.
 #[derive(Debug, Eq, PartialEq)]
 pub struct XGBError {
     desc: String,
 }
 
 impl XGBError {
-    pub fn new<S: Into<String>>(desc: S) -> Self {
+    pub(crate) fn new<S: Into<String>>(desc: S) -> Self {
         XGBError { desc: desc.into() }
     }
 
@@ -25,7 +27,7 @@ impl XGBError {
     /// Return values of 0 are treated as success, returns values of -1 are treated as errors.
     ///
     /// Meaning of any other return values are undefined, and will cause a panic.
-    pub fn check_return_value(ret_val: i32) -> XGBResult<()> {
+    pub(crate) fn check_return_value(ret_val: i32) -> XGBResult<()> {
         match ret_val {
             0  => Ok(()),
             -1 => Err(XGBError::from_xgboost()),
@@ -41,11 +43,7 @@ impl XGBError {
     }
 }
 
-impl Error for XGBError {
-    fn description(&self) -> &str {
-        &self.desc
-    }
-}
+impl Error for XGBError {}
 
 impl Display for XGBError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
