@@ -2,7 +2,7 @@
 
 [![Travis Build Status](https://travis-ci.com/davechallis/rust-xgboost.svg?branch=master)](https://travis-ci.com/davechallis/rust-xgboost)
 
-Rust bindings for the [XGBoost](https://xgboost.readthedocs.io/en/latest/) gradient boosting library.
+Rust bindings for the [XGBoost](https://xgboost.ai) gradient boosting library.
 
 Basic usage example:
 
