@@ -1,5 +1,5 @@
 use libc;
-use std::{fs::File, fmt, mem, slice, ffi, ptr};
+use std::{fs::File, fmt, slice, ffi, ptr};
 use std::str::FromStr;
 use std::io::{self, Write, BufReader, BufRead};
 use std::collections::BTreeMap;
@@ -252,8 +252,6 @@ impl Booster {
                                                      grad_vec.len() as u64))
     }
 
-    // TODO: cleaner to just accept a single DMatrix, no names, no iteration, and parse/return results
-    // in some structured format? E.g. BTreeMap<String, f32>?
     fn eval_set(&self, evals: &[(&DMatrix, &str)], iteration: i32) -> XGBResult<BTreeMap<String, BTreeMap<String, f32>>> {
         let (dmats, names) = {
             let mut dmats = Vec::with_capacity(evals.len());
@@ -268,21 +266,24 @@ impl Booster {
 
         let mut s: Vec<xgboost_sys::DMatrixHandle> = dmats.iter().map(|x| x.handle).collect();
 
-        let mut evnames: Vec<*const libc::c_char> = {
-            let mut evnames = Vec::new();
-            for name in &names {
-                let cstr = ffi::CString::new(*name).unwrap();
-                evnames.push(cstr.as_ptr());
-                mem::forget(cstr);
-            }
-            evnames
-        };
-        evnames.shrink_to_fit();
+        // build separate arrays of C strings and pointers to them to ensure they live long enough
+        let mut evnames: Vec<ffi::CString> = Vec::with_capacity(names.len());
+        let mut evptrs: Vec<*const libc::c_char> = Vec::with_capacity(names.len());
+
+        for name in &names {
+            let cstr = ffi::CString::new(*name).unwrap();
+            evptrs.push(cstr.as_ptr());
+            evnames.push(cstr);
+        }
+
+        // shouldn't be necessary, but guards against incorrect array sizing
+        evptrs.shrink_to_fit();
+
         let mut out_result = ptr::null();
         xgb_call!(xgboost_sys::XGBoosterEvalOneIter(self.handle,
                                                     iteration,
                                                     s.as_mut_ptr(),
-                                                    evnames.as_mut_ptr(),
+                                                    evptrs.as_mut_ptr(),
                                                     dmats.len() as u64,
                                                     &mut out_result))?;
         let out = unsafe { ffi::CStr::from_ptr(out_result).to_str().unwrap().to_owned() };

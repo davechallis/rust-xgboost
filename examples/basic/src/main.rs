@@ -4,7 +4,7 @@ extern crate env_logger;
 
 use std::io::{BufRead, BufReader};
 use std::fs::File;
-use xgboost::{parameters, dmatrix::DMatrix, booster::Booster};
+use xgboost::{parameters, DMatrix, Booster};
 
 fn main() {
     // Initialise logging, run with e.g. RUST_LOG=xgboost=debug to see more details
@@ -116,7 +116,7 @@ fn main() {
     let triplet_mat = sprs::TriMatBase::from_triplets(shape, rows, cols, data);
     let csr_mat = triplet_mat.to_csr();
 
-    let indices: Vec<u32> = csr_mat.indices().into_iter().map(|i| *i as u32).collect();
+    let indices: Vec<usize> = csr_mat.indices().into_iter().map(|i| *i as usize).collect();
     let mut dtrain = DMatrix::from_csr(csr_mat.indptr(), &indices, csr_mat.data(), None).unwrap();
     dtrain.set_labels(&labels).unwrap();
     let _bst = Booster::train(&params, &dtrain, num_round, &evaluation_sets).unwrap();

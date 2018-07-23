@@ -4,7 +4,7 @@ extern crate xgboost;
 extern crate ndarray;
 extern crate env_logger;
 
-use xgboost::{parameters, dmatrix::DMatrix, booster::Booster};
+use xgboost::{parameters, DMatrix, Booster};
 
 fn main() {
     // Initialise logging, run with e.g. RUST_LOG=xgboost=debug to see more details

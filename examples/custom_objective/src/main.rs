@@ -1,7 +1,7 @@
 extern crate xgboost;
 extern crate ndarray;
 
-use xgboost::{parameters, parameters::learning::EvaluationMetric, dmatrix::DMatrix, booster::Booster};
+use xgboost::{parameters, parameters::learning::EvaluationMetric, DMatrix, Booster};
 
 fn main() {
     // Load train and test matrices from text files (in LibSVM format).
