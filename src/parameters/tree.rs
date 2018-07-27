@@ -1,4 +1,4 @@
-//! Parameters for controlling tree boosters.
+//! BoosterParameters for controlling tree boosters.
 //!
 //!
 use std::default::Default;
@@ -172,7 +172,7 @@ impl Default for Predictor {
     fn default() -> Self { Predictor::Cpu }
 }
 
-/// Parameters for Tree Booster.
+/// BoosterParameters for Tree Booster.
 #[derive(Builder, Clone)]
 #[builder(build_fn(validate = "Self::validate"))]
 #[builder(default)]
@@ -301,7 +301,7 @@ pub struct TreeBoosterParameters {
 
     /// The type of predictor algorithm to use. Provides the same results but allows the use of GPU or CPU.
     ///
-    /// default: `Predictor::Cpu`
+    /// * default: [`Predictor::Cpu`](enum.Predictor.html#variant.Cpu)
     predictor: Predictor,
 }
 

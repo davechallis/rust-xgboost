@@ -36,8 +36,8 @@
 //!     let mut dtest = DMatrix::from_dense(x_test, num_rows).unwrap();
 //!     dtest.set_labels(y_test).unwrap();
 //!
-//!     // build overall training parameters
-//!     let params = parameters::ParametersBuilder::default().build().unwrap();
+//!     // build booster training parameters
+//!     let params = parameters::BoosterParameters::default();
 //!
 //!     // specify datasets to evaluate against during training
 //!     let evaluation_sets = &[(&dtrain, "train"), (&dtest, "test")];

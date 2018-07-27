@@ -1,3 +1,6 @@
+//! BoosterParameters for controlling
+//! [DART](https://xgboost.readthedocs.io/en/latest/tutorials/dart.html) boosters.
+
 use std::default::Default;
 
 use super::Interval;

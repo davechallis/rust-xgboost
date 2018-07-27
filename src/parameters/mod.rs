@@ -1,4 +1,4 @@
-//!
+//! Builders for parameters that control various aspects of training.
 use std::default::Default;
 use std::fmt::{self, Display};
 
@@ -6,14 +6,19 @@ pub mod tree;
 pub mod learning;
 pub mod linear;
 pub mod dart;
-pub mod booster;
+mod booster;
 
+pub use self::booster::BoosterType;
+
+/// Parameters for training boosters.
+/// Created using [`BoosterParametersBuilder`](struct.BoosterParametersBuilder.html).
 #[derive(Builder)]
 #[builder(default)]
-pub struct Parameters {
-    /// Which booster to use, can be gbtree, gblinear or dart. gbtree and dart use tree based model
-    /// while gblinear uses linear function.
-    booster_params: booster::BoosterParameters,
+pub struct BoosterParameters {
+    /// Type of booster (tree, linear or DART) to use.
+    ///
+    /// Default: [GbTree]`enum.BoosterType.html#variant.GbTree`
+    booster_type: booster::BoosterType,
 
     pub(crate) learning_params: learning::LearningTaskParameters,
 
@@ -26,10 +31,10 @@ pub struct Parameters {
     nthread: Option<u32>,
 }
 
-impl Default for Parameters {
+impl Default for BoosterParameters {
     fn default() -> Self {
-        Parameters {
-            booster_params: booster::BoosterParameters::default(),
+        BoosterParameters {
+            booster_type: booster::BoosterType::default(),
             learning_params: learning::LearningTaskParameters::default(),
             silent: false,
             nthread: None,
@@ -37,11 +42,11 @@ impl Default for Parameters {
     }
 }
 
-impl Parameters {
+impl BoosterParameters {
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
         let mut v = Vec::new();
 
-        v.extend(self.booster_params.as_string_pairs());
+        v.extend(self.booster_type.as_string_pairs());
         v.extend(self.learning_params.as_string_pairs());
 
         v.push(("silent".to_owned(), (self.silent as u8).to_string()));
@@ -54,34 +59,34 @@ impl Parameters {
     }
 }
 
-/// Parameters for Tweedie Regression.
-#[derive(Builder)]
-#[builder(build_fn(validate = "Self::validate"))]
-#[builder(default)]
-pub struct TweedieRegressionParameters {
-    /// Parameter that controls the variance of the Tweedie distribution.
-    ///
-    /// * var(y) ~ E(y)^tweedie_variance_power
-    /// * range: (1.0, 2.0)
-    /// * set closer to 2 to shift towards a gamma distribution
-    /// * set closer to 1 to shift towards a Poisson distribution
-    tweedie_variance_power: f32,
-}
-
-impl Default for TweedieRegressionParameters {
-    fn default() -> Self {
-        TweedieRegressionParameters {
-            tweedie_variance_power: 1.5,
-        }
-    }
-}
-
-impl TweedieRegressionParametersBuilder {
-    fn validate(&self) -> Result<(), String> {
-        Interval::new_open_open(1.0, 2.0).validate(&self.tweedie_variance_power, "tweedie_variance_power")?;
-        Ok(())
-    }
-}
+///// BoosterParameters for Tweedie Regression.
+//#[derive(Builder)]
+//#[builder(build_fn(validate = "Self::validate"))]
+//#[builder(default)]
+//pub struct TweedieRegressionParameters {
+//    /// Parameter that controls the variance of the Tweedie distribution.
+//    ///
+//    /// * var(y) ~ E(y)^tweedie_variance_power
+//    /// * range: (1.0, 2.0)
+//    /// * set closer to 2 to shift towards a gamma distribution
+//    /// * set closer to 1 to shift towards a Poisson distribution
+//    tweedie_variance_power: f32,
+//}
+//
+//impl Default for TweedieRegressionParameters {
+//    fn default() -> Self {
+//        TweedieRegressionParameters {
+//            tweedie_variance_power: 1.5,
+//        }
+//    }
+//}
+//
+//impl TweedieRegressionParametersBuilder {
+//    fn validate(&self) -> Result<(), String> {
+//        Interval::new_open_open(1.0, 2.0).validate(&self.tweedie_variance_power, "tweedie_variance_power")?;
+//        Ok(())
+//    }
+//}
 
 enum Inclusion {
     Open,
@@ -151,4 +156,3 @@ impl<T: PartialOrd + Display> Interval<T> {
         }
     }
 }
-

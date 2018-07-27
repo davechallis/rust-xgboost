@@ -12,7 +12,7 @@ use xgboost_sys;
 use tempfile;
 
 use super::XGBResult;
-use parameters::Parameters;
+use parameters::BoosterParameters;
 use parameters::learning::{CustomObjective, Objective, EvaluationMetric, Metrics};
 
 /// Used to control the return type of predictions made by C Booster API.
@@ -63,7 +63,7 @@ impl Booster {
     /// * `num_boost_round` - number of training iterations
     /// * `eval_sets` - list of datasets to evaluate after each boosting round
     pub fn train(
-        params: &Parameters,
+        params: &BoosterParameters,
         dtrain: &DMatrix,
         num_boost_round: u32,
         eval_sets: &[(&DMatrix, &str)],
@@ -183,14 +183,14 @@ impl Booster {
     ///
     /// The `train` function is often a more convenient way of constructing, training and evaluating
     /// a Booster in a single call.
-    pub fn create(params: &Parameters) -> XGBResult<Self> {
+    pub fn create(params: &BoosterParameters) -> XGBResult<Self> {
         Self::create_with_cached_dmats(params, &[])
     }
 
     /// Create a new Booster model with given parameters and list of DMatrix to cache.
     ///
     /// Cached DMatrix can sometimes be used internally by XGBoost to speed up certain operations.
-    pub fn create_with_cached_dmats(params: &Parameters, dmats: &[&DMatrix]) -> XGBResult<Self> {
+    pub fn create_with_cached_dmats(params: &BoosterParameters, dmats: &[&DMatrix]) -> XGBResult<Self> {
         let mut handle = ptr::null_mut();
         // TODO: check this is safe if any dmats are freed
         let s: Vec<xgboost_sys::DMatrixHandle> = dmats.iter().map(|x| x.handle).collect();
@@ -202,7 +202,7 @@ impl Booster {
     }
 
     /// Update this Booster's parameters.
-    pub fn set_params(&mut self, p: &Parameters) -> XGBResult<()> {
+    pub fn set_params(&mut self, p: &BoosterParameters) -> XGBResult<()> {
         for (key, value) in p.as_string_pairs() {
             debug!("Setting parameter: {}={}", &key, &value);
             self.set_param(&key, &value)?;
@@ -661,7 +661,7 @@ mod tests {
 
     fn load_test_booster() -> Booster {
         let dmat = read_train_matrix().expect("Reading train matrix failed");
-        Booster::create_with_cached_dmats(&Parameters::default(), &[&dmat]).expect("Creating Booster failed")
+        Booster::create_with_cached_dmats(&BoosterParameters::default(), &[&dmat]).expect("Creating Booster failed")
     }
 
     #[test]
@@ -723,8 +723,8 @@ mod tests {
                                                          learning::EvaluationMetric::BinaryErrorRate(0.5)]))
             .build()
             .unwrap();
-        let params = parameters::ParametersBuilder::default()
-            .booster_params(parameters::booster::BoosterParameters::GbTree(tree_params))
+        let params = parameters::BoosterParametersBuilder::default()
+            .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
             .silent(true)
             .build()
@@ -797,8 +797,8 @@ mod tests {
             .eval_metrics(learning::Metrics::Custom(vec![learning::EvaluationMetric::LogLoss]))
             .build()
             .unwrap();
-        let params = parameters::ParametersBuilder::default()
-            .booster_params(parameters::booster::BoosterParameters::GbTree(tree_params))
+        let params = parameters::BoosterParametersBuilder::default()
+            .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
             .silent(true)
             .build()
@@ -830,8 +830,8 @@ mod tests {
             .eval_metrics(learning::Metrics::Custom(vec![learning::EvaluationMetric::LogLoss]))
             .build()
             .unwrap();
-        let params = parameters::ParametersBuilder::default()
-            .booster_params(parameters::booster::BoosterParameters::GbTree(tree_params))
+        let params = parameters::BoosterParametersBuilder::default()
+            .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
             .silent(true)
             .build()
@@ -864,8 +864,8 @@ mod tests {
             .eval_metrics(learning::Metrics::Custom(vec![learning::EvaluationMetric::LogLoss]))
             .build()
             .unwrap();
-        let params = parameters::ParametersBuilder::default()
-            .booster_params(parameters::booster::BoosterParameters::GbTree(tree_params))
+        let params = parameters::BoosterParametersBuilder::default()
+            .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
             .silent(true)
             .build()
@@ -912,8 +912,8 @@ mod tests {
         let learning_params = learning::LearningTaskParametersBuilder::default()
             .objective(learning::Objective::BinaryLogistic)
             .build().unwrap();
-        let params = parameters::ParametersBuilder::default()
-            .booster_params(parameters::booster::BoosterParameters::GbTree(tree_params))
+        let params = parameters::BoosterParametersBuilder::default()
+            .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
             .silent(true)
             .build().unwrap();

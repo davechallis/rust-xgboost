@@ -7,32 +7,31 @@ extern crate env_logger;
 use xgboost::{parameters, DMatrix, Booster};
 
 fn main() {
-    // Initialise logging, run with e.g. RUST_LOG=xgboost=debug to see more details
+    // initialise logging, run with e.g. RUST_LOG=xgboost=debug to see more details
     env_logger::init();
 
-    // Load train and test matrices from text files (in LibSVM format)
+    // load train and test matrices from text files (in LibSVM format)
     println!("Custom objective example...");
     let dtrain = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap();
     let dtest = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.test").unwrap();
 
-    // Configure objectives, metrics, etc.
+    // configure objectives, metrics, etc.
     let learning_params = parameters::learning::LearningTaskParametersBuilder::default()
         .objective(parameters::learning::Objective::BinaryLogistic)
         .build().unwrap();
 
-    // Configure linear model parameters
-    let linear_params = parameters::linear::LinearBoosterParametersBuilder::default()
-        .alpha(0.0001)
-        .lambda(1.0)
-        .build().unwrap();
+    // configure linear model parameters
+    let booster_type = parameters::BoosterType::Linear(
+        parameters::linear::LinearBoosterParametersBuilder::default()
+            .alpha(0.0001)
+            .lambda(1.0)
+            .build().unwrap()
+    );
 
-    // Configure booster to use a linear model
-    let booster_params = parameters::booster::BoosterParameters::GbLinear(linear_params);
-
-    // Overall configuration for XGBoost
-    let params = parameters::ParametersBuilder::default()
+    // overall configuration for Booster
+    let booster_params = parameters::BoosterParametersBuilder::default()
         .learning_params(learning_params)
-        .booster_params(booster_params)
+        .booster_type(booster_type)
         .silent(true)
         .build().unwrap();
 
@@ -44,7 +43,7 @@ fn main() {
 
     // Train booster model, and print evaluation metrics
     println!("\nTraining tree booster...");
-    let bst = Booster::train(&params, &dtrain, num_round, &evaluation_sets).unwrap();
+    let bst = Booster::train(&booster_params, &dtrain, num_round, &evaluation_sets).unwrap();
 
     // Get predictions probabilities for given matrix (as ndarray::Array1)
     let preds = bst.predict(&dtest).unwrap();

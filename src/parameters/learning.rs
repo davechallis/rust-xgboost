@@ -1,3 +1,6 @@
+//! BoosterParameters for configuring learning objectives and evaluation metrics for all
+//! booster types.
+
 use std;
 use std::default::Default;
 use dmatrix::DMatrix;
@@ -172,7 +175,7 @@ impl ToString for EvaluationMetric {
     }
 }
 
-/// Parameters that configure the learning objective.
+/// BoosterParameters that configure the learning objective.
 ///
 /// See [`LearningTaskParametersBuilder`](struct.LearningTaskParametersBuilder.html), for details
 /// on parameters.

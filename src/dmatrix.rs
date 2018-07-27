@@ -94,10 +94,13 @@ impl DMatrix {
     ///  [3.0, 4.0],
     ///  [5.0, 6.0]]
     /// ```
-    /// would be represented as
+    /// would be represented converted into a `DMatrix` with
     /// ```
+    /// use xgboost::DMatrix;
+    ///
     /// let data = &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
     /// let num_rows = 3;
+    /// let dmat = DMatrix::from_dense(data, num_rows).unwrap();
     /// ```
     pub fn from_dense(data: &[f32], num_rows: usize) -> XGBResult<Self> {
         let mut handle = ptr::null_mut();
@@ -157,8 +160,12 @@ impl DMatrix {
 
     /// Create a new `DMatrix` from given file.
     ///
-    /// Supports text files in [LIBSVM](https://www.csie.ntu.edu.tw/~cjlin/libsvm/) format, or
+    /// Supports text files in [LIBSVM](https://www.csie.ntu.edu.tw/~cjlin/libsvm/) format, CSV,
     /// binary files written either by `save`, or from another XGBoost library.
+    ///
+    /// For more details on accepted formats, seem the
+    /// [XGBoost input format](https://xgboost.readthedocs.io/en/latest/tutorials/input_format.html)
+    /// documentation.
     ///
     /// # LIBSVM format
     ///

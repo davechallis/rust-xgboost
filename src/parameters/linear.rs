@@ -1,3 +1,5 @@
+//! BoosterParameters for configuring linear boosters.
+
 use std::default::Default;
 
 /// Linear model algorithm.
@@ -24,7 +26,7 @@ impl Default for LinearUpdate {
     fn default() -> Self { LinearUpdate::Shotgun }
 }
 
-/// Parameters for Linear Booster.
+/// BoosterParameters for Linear Booster.
 #[derive(Builder, Clone)]
 #[builder(default)]
 pub struct LinearBoosterParameters {
