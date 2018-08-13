@@ -17,22 +17,20 @@ fn main() {
     let dtest = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.test").unwrap();
     println!("Test matrix: {}x{}", dtest.num_rows(), dtest.num_cols());
 
-    // configure booster to use tree model with given parameters
-    let booster_type = parameters::BoosterType::Tree(
-        parameters::tree::TreeBoosterParametersBuilder::default()
-            .max_depth(2)
-            .eta(1.0)
-            .build().unwrap()
-    );
-
     // configure objectives, metrics, etc.
     let learning_params = parameters::learning::LearningTaskParametersBuilder::default()
         .objective(parameters::learning::Objective::BinaryLogistic)
         .build().unwrap();
 
+    // configure the tree-based learning model's parameters
+    let tree_params = parameters::tree::TreeBoosterParametersBuilder::default()
+            .max_depth(2)
+            .eta(1.0)
+            .build().unwrap();
+
     // overall configuration for Booster
-    let params = parameters::BoosterParametersBuilder::default()
-        .booster_type(booster_type)
+    let booster_params = parameters::BoosterParametersBuilder::default()
+        .booster_type(parameters::BoosterType::Tree(tree_params))
         .learning_params(learning_params)
         .silent(false)
         .build().unwrap();
@@ -40,15 +38,20 @@ fn main() {
     // specify datasets to evaluate against during training
     let evaluation_sets = [(&dtest, "test"), (&dtrain, "train")];
 
-    // number of boosting rounds to run during training
-    let num_round = 2;
+    // overall configuration for training/evaluation
+    let training_params = parameters::TrainingParametersBuilder::default()
+        .dtrain(&dtrain)                         // dataset to train with
+        .boost_rounds(2)                         // number of training iterations
+        .booster_params(booster_params)          // model parameters
+        .evaluation_sets(Some(&evaluation_sets)) // optional datasets to evaluate against in each iteration
+        .build().unwrap();
 
     // train booster model, and print evaluation metrics
     println!("\nTraining tree booster...");
-    let bst = Booster::train(&params, &dtrain, num_round, &evaluation_sets).unwrap();
+    let booster = Booster::train(&training_params).unwrap();
 
     // get predictions probabilities for given matrix
-    let preds = bst.predict(&dtest).unwrap();
+    let preds = booster.predict(&dtest).unwrap();
 
     // get predicted labels for each test example (i.e. 0 or 1)
     println!("\nChecking predictions...");
@@ -63,22 +66,22 @@ fn main() {
 
     // save and load model file
     println!("\nSaving and loading Booster model...");
-    bst.save("xgb.model").unwrap();
-    let bst = Booster::load("xgb.model").unwrap();
-    let preds2 = bst.predict(&dtest).unwrap();
+    booster.save("xgb.model").unwrap();
+    let booster = Booster::load("xgb.model").unwrap();
+    let preds2 = booster.predict(&dtest).unwrap();
     assert_eq!(preds, preds2);
 
     // save and load data matrix file
     println!("\nSaving and loading matrix data...");
     dtest.save("test.dmat").unwrap();
     let dtest2 = DMatrix::load("test.dmat").unwrap();
-    assert_eq!(bst.predict(&dtest2).unwrap(), preds);
+    assert_eq!(booster.predict(&dtest2).unwrap(), preds);
 
     // error handling example
     println!("\nError message example...");
     let result = Booster::load("/does/not/exist");
     match result {
-        Ok(_bst) => (),
+        Ok(_booster) => (),
         Err(err) => println!("Got expected error: {}", err),
     }
 
@@ -119,5 +122,7 @@ fn main() {
     let indices: Vec<usize> = csr_mat.indices().into_iter().map(|i| *i as usize).collect();
     let mut dtrain = DMatrix::from_csr(csr_mat.indptr(), &indices, csr_mat.data(), None).unwrap();
     dtrain.set_labels(&labels).unwrap();
-    let _bst = Booster::train(&params, &dtrain, num_round, &evaluation_sets).unwrap();
+
+    let training_params = parameters::TrainingParametersBuilder::default().dtrain(&dtrain).build().unwrap();
+    let _ = Booster::train(&training_params).unwrap();
 }

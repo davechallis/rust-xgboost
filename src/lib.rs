@@ -36,15 +36,18 @@
 //!     let mut dtest = DMatrix::from_dense(x_test, num_rows).unwrap();
 //!     dtest.set_labels(y_test).unwrap();
 //!
-//!     // build booster training parameters
-//!     let params = parameters::BoosterParameters::default();
-//!
 //!     // specify datasets to evaluate against during training
 //!     let evaluation_sets = &[(&dtrain, "train"), (&dtest, "test")];
 //!
+//!     // specify overall training setup
+//!     let training_params = parameters::TrainingParametersBuilder::default()
+//!         .dtrain(&dtrain)
+//!         .evaluation_sets(Some(evaluation_sets))
+//!         .build()
+//!         .unwrap();
+//!
 //!     // train model, and print evaluation data
-//!     let num_rounds = 3;
-//!     let bst = Booster::train(&params, &dtrain, num_rounds, evaluation_sets).unwrap();
+//!     let bst = Booster::train(&training_params).unwrap();
 //!
 //!     println!("{:?}", bst.predict(&dtest).unwrap());
 //! }

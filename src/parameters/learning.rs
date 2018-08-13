@@ -3,9 +3,6 @@
 
 use std;
 use std::default::Default;
-use dmatrix::DMatrix;
-
-pub type CustomObjective = fn(&[f32], &DMatrix) -> (Vec<f32>, Vec<f32>);
 
 pub enum Objective {
     RegLinear,
@@ -23,7 +20,6 @@ pub enum Objective {
     RankPairwise,
     RegGamma,
     RegTweedie,
-    Custom(CustomObjective),
 }
 
 impl Copy for Objective {}
@@ -50,7 +46,6 @@ impl ToString for Objective {
             Objective::RankPairwise => "rank:pairwise".to_owned(),
             Objective::RegGamma => "reg:gamma".to_owned(),
             Objective::RegTweedie => "reg:tweedie".to_owned(),
-            Objective::Custom(_) => panic!("to_string should never be called for Custom"),
         }
     }
 }
@@ -68,8 +63,6 @@ pub enum Metrics {
     /// Use custom list of metrics.
     Custom(Vec<EvaluationMetric>),
 }
-
-type CustomEvaluationMetric = fn(&[f32], &DMatrix) -> f32;
 
 #[derive(Clone)]
 pub enum EvaluationMetric {
@@ -137,8 +130,6 @@ pub enum EvaluationMetric {
 
     /// Negative log likelihood for Tweedie regression (at a specified value of the tweedie_variance_power parameter).
     TweedieLogLoss,
-
-    Custom(String, CustomEvaluationMetric),
 }
 
 impl ToString for EvaluationMetric {
@@ -170,7 +161,6 @@ impl ToString for EvaluationMetric {
             EvaluationMetric::CoxLogLoss          => "cox-nloglik".to_owned(),
             EvaluationMetric::GammaDeviance       => "gamma-deviance".to_owned(),
             EvaluationMetric::TweedieLogLoss      => "tweedie-nloglik".to_owned(),
-            EvaluationMetric::Custom(_, _)        => panic!("to_string should never be called for Custom"),
         }
     }
 }
@@ -203,19 +193,13 @@ impl LearningTaskParameters {
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
         let mut v = Vec::new();
 
-        match self.objective {
-            Objective::Custom(_) => (),
-            objective => v.push(("objective".to_owned(), objective.to_string())),
-        }
+        v.push(("objective".to_owned(), self.objective.to_string()));
         v.push(("base_score".to_owned(), self.base_score.to_string()));
         v.push(("seed".to_owned(), self.seed.to_string()));
 
         if let Metrics::Custom(eval_metrics) = &self.eval_metrics {
             for metric in eval_metrics {
-                match metric {
-                    EvaluationMetric::Custom(_, _) => (),
-                    metric                         => v.push(("eval_metric".to_owned(), metric.to_string())),
-                }
+                v.push(("eval_metric".to_owned(), metric.to_string()));
             }
         }
 

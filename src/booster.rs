@@ -12,8 +12,9 @@ use xgboost_sys;
 use tempfile;
 
 use super::XGBResult;
-use parameters::BoosterParameters;
-use parameters::learning::{CustomObjective, Objective, EvaluationMetric, Metrics};
+use parameters::{BoosterParameters, TrainingParameters};
+
+pub type CustomObjective = fn(&[f32], &DMatrix) -> (Vec<f32>, Vec<f32>);
 
 /// Used to control the return type of predictions made by C Booster API.
 enum PredictOption {
@@ -44,114 +45,41 @@ impl PredictOption {
 }
 
 /// Core model in XGBoost, containing functions for training, evaluating and predicting.
+///
+/// Usually created through the [`train`](struct.Booster.html#method.train) function, which
+/// creates and trains a Booster in a single call.
+///
+/// For more fine grained usage, can be created using [`new`](struct.Booster.html#method.new) or
+/// [`new_with_cached_dmats`](struct.Booster.html#method.new_with_cached_dmats), then trained by calling
+/// [`update`](struct.Booster.html#method.update) or [`update_custom`](struct.Booster.html#method.update_custom)
+/// in a loop.
 pub struct Booster {
     handle: xgboost_sys::BoosterHandle,
 }
 
 impl Booster {
-    /// Convenience function for creating/training a new Booster.
+    /// Create a new Booster model with given parameters.
     ///
-    /// This does the following:
+    /// This model can then be trained using calls to update/boost as appropriate.
     ///
-    /// 1. create a new Booster model with given parameters
-    /// 2. train the model with given DMatrix
-    /// 3. print out evaluation results for each training round
-    /// 4. return trained Booster
+    /// The [`train`](struct.Booster.html#method.train)  function is often a more convenient way of constructing,
+    /// training and evaluating a Booster in a single call.
+    pub fn new(params: &BoosterParameters) -> XGBResult<Self> {
+        Self::new_with_cached_dmats(params, &[])
+    }
+
+    /// Create a new Booster model with given parameters and list of DMatrix to cache.
     ///
-    /// * `params` - training parameters
-    /// * `dtrain` - matrix to train Booster with
-    /// * `num_boost_round` - number of training iterations
-    /// * `eval_sets` - list of datasets to evaluate after each boosting round
-    pub fn train(
-        params: &BoosterParameters,
-        dtrain: &DMatrix,
-        num_boost_round: u32,
-        eval_sets: &[(&DMatrix, &str)],
-    ) -> XGBResult<Self> {
-        let dmats = {
-            let mut dmats = vec![dtrain];
-            for (dmat, _) in eval_sets {
-                dmats.push(dmat);
-            }
-            dmats
-        };
+    /// Cached DMatrix can sometimes be used internally by XGBoost to speed up certain operations.
+    pub fn new_with_cached_dmats(params: &BoosterParameters, dmats: &[&DMatrix]) -> XGBResult<Self> {
+        let mut handle = ptr::null_mut();
+        // TODO: check this is safe if any dmats are freed
+        let s: Vec<xgboost_sys::DMatrixHandle> = dmats.iter().map(|x| x.handle).collect();
+        xgb_call!(xgboost_sys::XGBoosterCreate(s.as_ptr(), dmats.len() as u64, &mut handle))?;
 
-        let mut bst = Booster::create_with_cached_dmats(&params, &dmats)?;
-        //let num_parallel_tree = 1;
-
-        // load distributed code checkpoint from rabit
-        let version = bst.load_rabit_checkpoint()?;
-        debug!("Loaded Rabit checkpoint: version={}", version);
-        assert!(unsafe { xgboost_sys::RabitGetWorldSize() != 1 || version == 0 });
-
-        let _rank = unsafe { xgboost_sys::RabitGetRank() };
-        let start_iteration = version / 2;
-        //let mut nboost = start_iteration;
-
-        let custom_eval_funcs = {
-            let mut eval_funcs = Vec::new();
-            if let Metrics::Custom(ref eval_metrics) = params.learning_params.eval_metrics {
-                for eval_metric in eval_metrics {
-                    if let EvaluationMetric::Custom(name, eval_func) = eval_metric {
-                        eval_funcs.push((name, eval_func));
-                    }
-                }
-            }
-            eval_funcs
-        };
-
-        for i in start_iteration..num_boost_round as i32 {
-            // distributed code: need to resume to this point
-            // skip first update if a recovery step
-            if version % 2 == 0 {
-                if let Objective::Custom(objective_fn) = params.learning_params.objective {
-                    debug!("Boosting in round: {}", i);
-                    bst.update_custom(dtrain, objective_fn)?;
-                } else {
-                    debug!("Updating in round: {}", i);
-                    bst.update(&dtrain, i)?;
-                }
-                bst.save_rabit_checkpoint()?;
-            }
-
-            assert!(unsafe { xgboost_sys::RabitGetWorldSize() == 1 || version == xgboost_sys::RabitVersionNumber() });
-
-            //nboost += 1;
-
-            if !eval_sets.is_empty() {
-                let mut dmat_eval_results = bst.eval_set(eval_sets, i)?;
-
-                if !custom_eval_funcs.is_empty() {
-                    for (dmat, dmat_name) in eval_sets {
-                        let margin = bst.predict_margin(dmat)?;
-                        for (eval_name, eval_func) in &custom_eval_funcs {
-                            let eval_result = eval_func(&margin, dmat);
-                            let mut eval_results = dmat_eval_results.entry(dmat_name.to_string()).or_insert_with(BTreeMap::new);
-                            eval_results.insert(eval_name.to_string(), eval_result);
-                        }
-                    }
-                }
-
-                // convert to map of eval_name -> (dmat_name -> score)
-                let mut eval_dmat_results = BTreeMap::new();
-                for (dmat_name, eval_results) in &dmat_eval_results {
-                    for (eval_name, result) in eval_results {
-                        let mut dmat_results = eval_dmat_results.entry(eval_name).or_insert_with(BTreeMap::new);
-                        dmat_results.insert(dmat_name, result);
-                    }
-                }
-
-                print!("[{}]", i);
-                for (eval_name, dmat_results) in eval_dmat_results {
-                    for (dmat_name, result) in dmat_results {
-                        print!("\t{}-{}:{}", dmat_name, eval_name, result);
-                    }
-                }
-                println!();
-            }
-        }
-
-        Ok(bst)
+        let mut booster = Booster { handle };
+        booster.set_params(params)?;
+        Ok(booster)
     }
 
     /// Save this Booster as a binary file at given path.
@@ -177,28 +105,94 @@ impl Booster {
         Ok(Booster { handle })
     }
 
-    /// Create a new Booster model with given parameters.
+    /// Convenience function for creating/training a new Booster.
     ///
-    /// This model can then be trained using calls to update/boost as appropriate.
+    /// This does the following:
     ///
-    /// The `train` function is often a more convenient way of constructing, training and evaluating
-    /// a Booster in a single call.
-    pub fn create(params: &BoosterParameters) -> XGBResult<Self> {
-        Self::create_with_cached_dmats(params, &[])
-    }
+    /// 1. create a new Booster model with given parameters
+    /// 2. train the model with given DMatrix
+    /// 3. print out evaluation results for each training round
+    /// 4. return trained Booster
+    ///
+    /// * `params` - training parameters
+    /// * `dtrain` - matrix to train Booster with
+    /// * `num_boost_round` - number of training iterations
+    /// * `eval_sets` - list of datasets to evaluate after each boosting round
+    pub fn train(params: &TrainingParameters) -> XGBResult<Self> {
+        let cached_dmats = {
+            let mut dmats = vec![params.dtrain];
+            if let Some(eval_sets) = params.evaluation_sets {
+                for (dmat, _) in eval_sets {
+                    dmats.push(*dmat);
+                }
+            }
+            dmats
+        };
 
-    /// Create a new Booster model with given parameters and list of DMatrix to cache.
-    ///
-    /// Cached DMatrix can sometimes be used internally by XGBoost to speed up certain operations.
-    pub fn create_with_cached_dmats(params: &BoosterParameters, dmats: &[&DMatrix]) -> XGBResult<Self> {
-        let mut handle = ptr::null_mut();
-        // TODO: check this is safe if any dmats are freed
-        let s: Vec<xgboost_sys::DMatrixHandle> = dmats.iter().map(|x| x.handle).collect();
-        xgb_call!(xgboost_sys::XGBoosterCreate(s.as_ptr(), dmats.len() as u64, &mut handle))?;
+        let mut bst = Booster::new_with_cached_dmats(&params.booster_params, &cached_dmats)?;
+        //let num_parallel_tree = 1;
 
-        let mut booster = Booster { handle };
-        booster.set_params(params)?;
-        Ok(booster)
+        // load distributed code checkpoint from rabit
+        let version = bst.load_rabit_checkpoint()?;
+        debug!("Loaded Rabit checkpoint: version={}", version);
+        assert!(unsafe { xgboost_sys::RabitGetWorldSize() != 1 || version == 0 });
+
+        let _rank = unsafe { xgboost_sys::RabitGetRank() };
+        let start_iteration = version / 2;
+        //let mut nboost = start_iteration;
+
+        for i in start_iteration..params.boost_rounds as i32 {
+            // distributed code: need to resume to this point
+            // skip first update if a recovery step
+            if version % 2 == 0 {
+                if let Some(objective_fn) = params.custom_objective_fn {
+                    debug!("Boosting in round: {}", i);
+                    bst.update_custom(params.dtrain, objective_fn)?;
+                } else {
+                    debug!("Updating in round: {}", i);
+                    bst.update(params.dtrain, i)?;
+                }
+                bst.save_rabit_checkpoint()?;
+            }
+
+            assert!(unsafe { xgboost_sys::RabitGetWorldSize() == 1 || version == xgboost_sys::RabitVersionNumber() });
+
+            //nboost += 1;
+
+            if let Some(eval_sets) = params.evaluation_sets {
+                let mut dmat_eval_results = bst.eval_set(eval_sets, i)?;
+
+                if let Some(eval_fn) = params.custom_evaluation_fn {
+                    let eval_name = "custom";
+                    for (dmat, dmat_name) in eval_sets {
+                        let margin = bst.predict_margin(dmat)?;
+                        let eval_result = eval_fn(&margin, dmat);
+                        let mut eval_results = dmat_eval_results.entry(eval_name.to_string())
+                            .or_insert_with(BTreeMap::new);
+                        eval_results.insert(dmat_name.to_string(), eval_result);
+                    }
+                }
+
+                // convert to map of eval_name -> (dmat_name -> score)
+                let mut eval_dmat_results = BTreeMap::new();
+                for (dmat_name, eval_results) in &dmat_eval_results {
+                    for (eval_name, result) in eval_results {
+                        let mut dmat_results = eval_dmat_results.entry(eval_name).or_insert_with(BTreeMap::new);
+                        dmat_results.insert(dmat_name, result);
+                    }
+                }
+
+                print!("[{}]", i);
+                for (eval_name, dmat_results) in eval_dmat_results {
+                    for (dmat_name, result) in dmat_results {
+                        print!("\t{}-{}:{}", dmat_name, eval_name, result);
+                    }
+                }
+                println!();
+            }
+        }
+
+        Ok(bst)
     }
 
     /// Update this Booster's parameters.
@@ -661,7 +655,7 @@ mod tests {
 
     fn load_test_booster() -> Booster {
         let dmat = read_train_matrix().expect("Reading train matrix failed");
-        Booster::create_with_cached_dmats(&BoosterParameters::default(), &[&dmat]).expect("Creating Booster failed")
+        Booster::new_with_cached_dmats(&BoosterParameters::default(), &[&dmat]).expect("Creating Booster failed")
     }
 
     #[test]
@@ -729,7 +723,7 @@ mod tests {
             .silent(true)
             .build()
             .unwrap();
-        let mut booster = Booster::create_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
+        let mut booster = Booster::new_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
 
         for i in 0..10 {
             booster.update(&dmat_train, i).expect("update failed");
@@ -803,7 +797,7 @@ mod tests {
             .silent(true)
             .build()
             .unwrap();
-        let mut booster = Booster::create_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
+        let mut booster = Booster::new_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
 
         let num_rounds = 15;
         for i in 0..num_rounds {
@@ -836,7 +830,7 @@ mod tests {
             .silent(true)
             .build()
             .unwrap();
-        let mut booster = Booster::create_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
+        let mut booster = Booster::new_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
 
         let num_rounds = 5;
         for i in 0..num_rounds {
@@ -870,7 +864,7 @@ mod tests {
             .silent(true)
             .build()
             .unwrap();
-        let mut booster = Booster::create_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
+        let mut booster = Booster::new_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
 
         let num_rounds = 5;
         for i in 0..num_rounds {
@@ -912,12 +906,18 @@ mod tests {
         let learning_params = learning::LearningTaskParametersBuilder::default()
             .objective(learning::Objective::BinaryLogistic)
             .build().unwrap();
-        let params = parameters::BoosterParametersBuilder::default()
+        let booster_params = parameters::BoosterParametersBuilder::default()
             .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
             .silent(true)
             .build().unwrap();
-        let booster = Booster::train(&params, &dmat_train, 10, &[]).unwrap();
+
+        let training_params = parameters::TrainingParametersBuilder::default()
+            .booster_params(booster_params)
+            .dtrain(&dmat_train)
+            .boost_rounds(10)
+            .build().unwrap();
+        let booster = Booster::train(&training_params).unwrap();
 
         let features = FeatureMap::from_file("xgboost-sys/xgboost/demo/data/featmap.txt")
             .expect("failed to parse feature map file");

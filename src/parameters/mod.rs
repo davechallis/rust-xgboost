@@ -8,11 +8,13 @@ pub mod linear;
 pub mod dart;
 mod booster;
 
+use super::DMatrix;
 pub use self::booster::BoosterType;
+use super::booster::CustomObjective;
 
 /// Parameters for training boosters.
 /// Created using [`BoosterParametersBuilder`](struct.BoosterParametersBuilder.html).
-#[derive(Builder)]
+#[derive(Builder, Clone)]
 #[builder(default)]
 pub struct BoosterParameters {
     /// Type of booster (tree, linear or DART) to use.
@@ -58,6 +60,32 @@ impl BoosterParameters {
         v
     }
 }
+
+type CustomEvaluationMetric = fn(&[f32], &DMatrix) -> f32;
+
+/// Parameters used by the [`Booster::train`](../struct.Booster.html#method.train) method for training new models.
+/// Created using [`TrainingParametersBuilder`](struct.TrainingParametersBuilder.html).
+#[derive(Builder, Clone)]
+pub struct TrainingParameters<'a> {
+    pub(crate) dtrain: &'a DMatrix,
+
+    #[builder(default="10")]
+    pub(crate) boost_rounds: u32,
+
+    #[builder(default="BoosterParameters::default()")]
+    pub(crate) booster_params: BoosterParameters,
+
+    #[builder(default="None")]
+    pub(crate) evaluation_sets: Option<&'a[(&'a DMatrix, &'a str)]>,
+
+    #[builder(default="None")]
+    pub(crate) custom_objective_fn: Option<CustomObjective>,
+
+    #[builder(default="None")]
+    pub(crate) custom_evaluation_fn: Option<CustomEvaluationMetric>,
+    // TODO: callbacks
+}
+
 
 ///// BoosterParameters for Tweedie Regression.
 //#[derive(Builder)]

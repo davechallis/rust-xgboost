@@ -21,29 +21,31 @@ fn main() {
         .build().unwrap();
 
     // configure linear model parameters
-    let booster_type = parameters::BoosterType::Linear(
-        parameters::linear::LinearBoosterParametersBuilder::default()
+    let linear_params = parameters::linear::LinearBoosterParametersBuilder::default()
             .alpha(0.0001)
             .lambda(1.0)
-            .build().unwrap()
-    );
+            .build().unwrap();
 
     // overall configuration for Booster
     let booster_params = parameters::BoosterParametersBuilder::default()
         .learning_params(learning_params)
-        .booster_type(booster_type)
+        .booster_type(parameters::BoosterType::Linear(linear_params))
         .silent(true)
         .build().unwrap();
 
     // Specify datasets to evaluate against during training
     let evaluation_sets = [(&dtest, "test"), (&dtrain, "train")];
 
-    // Number of boosting rounds to run during training
-    let num_round = 4;
+    let training_params = parameters::TrainingParametersBuilder::default()
+        .dtrain(&dtrain)
+        .boost_rounds(4)
+        .booster_params(booster_params)
+        .evaluation_sets(Some(&evaluation_sets))
+        .build().unwrap();
 
     // Train booster model, and print evaluation metrics
     println!("\nTraining tree booster...");
-    let bst = Booster::train(&booster_params, &dtrain, num_round, &evaluation_sets).unwrap();
+    let bst = Booster::train(&training_params).unwrap();
 
     // Get predictions probabilities for given matrix (as ndarray::Array1)
     let preds = bst.predict(&dtest).unwrap();

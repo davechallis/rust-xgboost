@@ -9,6 +9,9 @@ fn main() {
     let dtrain = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap();
     let dtest = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.test").unwrap();
 
+    // specify datasets to evaluate against during training
+    let evaluation_sets = [(&dtest, "test"), (&dtrain, "train")];
+
     // define custom objective function
     fn log_reg_obj(preds: &[f32], dtrain: &DMatrix) -> (Vec<f32>, Vec<f32>) {
         let mut preds = ndarray::Array1::from_vec(preds.to_vec());
@@ -36,38 +39,29 @@ fn main() {
         num_incorrect as f32 / labels.len() as f32
     }
 
-    let custom_metric = EvaluationMetric::Custom("error".to_string(), eval_error);
-
-    // configure objectives, metrics, etc.
-    let learning_params = parameters::learning::LearningTaskParametersBuilder::default()
-        .objective(parameters::learning::Objective::Custom(log_reg_obj))
-        .eval_metrics(parameters::learning::Metrics::Custom(vec![custom_metric, EvaluationMetric::RMSE]))
-        .build().unwrap();
-
-    // Configure booster to use tree model with given parameters
-    let booster_type = parameters::BoosterType::Tree(
-        parameters::tree::TreeBoosterParametersBuilder::default()
+    let tree_params = parameters::tree::TreeBoosterParametersBuilder::default()
             .max_depth(2)
             .eta(1.0)
-            .build().unwrap()
-    );
+            .build().unwrap();
 
     // overall configuration for Booster
     let booster_params = parameters::BoosterParametersBuilder::default()
-        .learning_params(learning_params)
-        .booster_type(booster_type)
+        .learning_params(parameters::learning::LearningTaskParameters::default())
+        .booster_type(parameters::BoosterType::Tree(tree_params))
         .silent(true)
         .build().unwrap();
 
-    // specify datasets to evaluate against during training
-    let evaluation_sets = [(&dtest, "test"), (&dtrain, "train")];
-
-    // number of boosting rounds to run during training
-    let num_round = 2;
+    let training_params = parameters::TrainingParametersBuilder::default()
+        .dtrain(&dtrain)
+        .boost_rounds(2)
+        .evaluation_sets(Some(&evaluation_sets))
+        .custom_objective_fn(Some(log_reg_obj))
+        .custom_evaluation_fn(Some(eval_error))
+        .build().unwrap();
 
     // train booster model, and print evaluation metrics
     println!("\nTraining tree booster...");
-    let bst = Booster::train(&booster_params, &dtrain, num_round, &evaluation_sets).unwrap();
+    let bst = Booster::train(&training_params).unwrap();
 
     // get predictions probabilities for given matrix
     let preds = bst.predict(&dtest).unwrap();
