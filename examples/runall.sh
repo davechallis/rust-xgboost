@@ -2,7 +2,7 @@
 
 set -e
 
-examples=(basic custom_objective generalised_linear_model)
+examples=(basic custom_objective generalised_linear_model multiclass_classification)
 
 for example in "${examples[@]}"
 do

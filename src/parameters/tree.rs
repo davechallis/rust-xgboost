@@ -172,7 +172,8 @@ impl Default for Predictor {
     fn default() -> Self { Predictor::Cpu }
 }
 
-/// BoosterParameters for Tree Booster.
+/// BoosterParameters for Tree Booster. Create using
+/// [`TreeBoosterParametersBuilder`](struct.TreeBoosterParametersBuilder.html).
 #[derive(Builder, Clone)]
 #[builder(build_fn(validate = "Self::validate"))]
 #[builder(default)]

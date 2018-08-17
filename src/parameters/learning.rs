@@ -4,21 +4,58 @@
 use std;
 use std::default::Default;
 
+/// Learning objective used when training a booster model.
 pub enum Objective {
+    /// Linear regression.
     RegLinear,
+
+    /// Logistic regression.
     RegLogistic,
+
+    /// Logistic regression for binary classification, outputs probability.
     BinaryLogistic,
-    BinaryLogitRaw,
+
+    /// Logistic regression for binary classification, outputs scores before logistic transformation.
+    BinaryLogisticRaw,
+
+    /// GPU version of [`RegLinear`](#variant.RegLinear).
     GpuRegLinear,
+
+    /// GPU version of [`RegLogistic`](#variant.RegLogistic).
     GpuRegLogistic,
+
+    /// GPU version of [`RegBinaryLogistic`](#variant.RegBinaryLogistic).
     GpuBinaryLogistic,
-    GpuBinaryLogitRaw,
+
+    /// GPU version of [`RegBinaryLogisticRaw`](#variant.RegBinaryLogisticRaw).
+    GpuBinaryLogisticRaw,
+
+    /// Poisson regression for count data, outputs mean of poisson distribution.
     CountPoisson,
+
+    /// Cox regression for right censored survival time data (negative values are considered right
+    /// censored).
+    ///
+    /// predictions are returned on the hazard ratio scale (i.e., as `HR = exp(marginal_prediction)`
+    /// in the proportional hazard function `h(t) = h0(t) * HR`).
     SurvivalCox,
-    MultiSoftmax,
-    MultiSoftprob,
+
+    /// Multiclass classification using the softmax objective, with given number of classes.
+    MultiSoftmax(u32),
+
+    /// Multiclass classification using the softmax objective, with given number of classes.
+    ///
+    /// Outputs probabilities per class.
+    MultiSoftprob(u32),
+
+    /// Ranking task which minimises pairwise loss.
     RankPairwise,
+
+    /// Gamma regression with log-link. Output is the mean of the gamma distribution.
     RegGamma,
+
+    // TODO: tweedie params
+    /// Tweedie regression with log-link.
     RegTweedie,
 }
 
@@ -34,15 +71,15 @@ impl ToString for Objective {
             Objective::RegLinear => "reg:linear".to_owned(),
             Objective::RegLogistic => "reg:logistic".to_owned(),
             Objective::BinaryLogistic => "binary:logistic".to_owned(),
-            Objective::BinaryLogitRaw => "binary:logitraw".to_owned(),
+            Objective::BinaryLogisticRaw => "binary:logitraw".to_owned(),
             Objective::GpuRegLinear => "gpu:reg:linear".to_owned(),
             Objective::GpuRegLogistic => "gpu:reg:logistic".to_owned(),
             Objective::GpuBinaryLogistic => "gpu:binary:logistic".to_owned(),
-            Objective::GpuBinaryLogitRaw => "gpu:binary:logitraw".to_owned(),
+            Objective::GpuBinaryLogisticRaw => "gpu:binary:logitraw".to_owned(),
             Objective::CountPoisson => "count:poisson".to_owned(),
             Objective::SurvivalCox => "survival:cox".to_owned(),
-            Objective::MultiSoftmax => "multi:softmax".to_owned(),
-            Objective::MultiSoftprob => "multi:softprob".to_owned(),
+            Objective::MultiSoftmax(_) => "multi:softmax".to_owned(), // num_class conf must also be set
+            Objective::MultiSoftprob(_) => "multi:softprob".to_owned(), // num_class conf must also be set
             Objective::RankPairwise => "rank:pairwise".to_owned(),
             Objective::RegGamma => "reg:gamma".to_owned(),
             Objective::RegTweedie => "reg:tweedie".to_owned(),
@@ -64,6 +101,7 @@ pub enum Metrics {
     Custom(Vec<EvaluationMetric>),
 }
 
+/// Type of evaluation metric used on validation data.
 #[derive(Clone)]
 pub enum EvaluationMetric {
     /// Root Mean Square Error.
@@ -172,9 +210,24 @@ impl ToString for EvaluationMetric {
 #[derive(Builder, Clone)]
 #[builder(default)]
 pub struct LearningTaskParameters {
+    /// Learning objective used when training.
+    ///
+    /// *default*: [`RegLinear`](enum.Objective.html#variant.RegLinear)
     pub(crate) objective: Objective,
+
+    /// Initial prediction score, i.e. global bias.
+    ///
+    /// *default*: 0.5
     base_score: f32,
+
+    /// Metrics to use on evaluation data sets during training.
+    ///
+    /// *default*: [`Auto`](enum.Metrics.html#variant.Auto) (i.e. metrics selected automatically based on objective)
     pub(crate) eval_metrics: Metrics,
+
+    /// Random seed.
+    ///
+    /// *default*: 0
     seed: u64,
 }
 
@@ -190,8 +243,46 @@ impl Default for LearningTaskParameters {
 }
 
 impl LearningTaskParameters {
+    pub fn objective(&self) -> &Objective {
+        &self.objective
+    }
+
+    pub fn set_objective<T: Into<Objective>>(&mut self, objective: T) {
+        self.objective = objective.into();
+    }
+
+    pub fn base_score(&self) -> f32 {
+        self.base_score
+    }
+
+    pub fn set_base_score(&mut self, base_score: f32) {
+        self.base_score = base_score;
+    }
+
+    pub fn eval_metrics(&self) -> &Metrics {
+        &self.eval_metrics
+    }
+
+    pub fn set_eval_metrics<T: Into<Metrics>>(&mut self, eval_metrics: T) {
+        self.eval_metrics = eval_metrics.into();
+    }
+
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    pub fn set_seed(&mut self, seed: u64) {
+        self.seed = seed;
+    }
+
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
         let mut v = Vec::new();
+
+        if let Objective::MultiSoftmax(n) = self.objective {
+            v.push(("num_class".to_owned(), n.to_string()));
+        } else if let Objective::MultiSoftprob(n) = self.objective {
+            v.push(("num_class".to_owned(), n.to_string()));
+        }
 
         v.push(("objective".to_owned(), self.objective.to_string()));
         v.push(("base_score".to_owned(), self.base_score.to_string()));

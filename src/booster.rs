@@ -2,7 +2,7 @@ use libc;
 use std::{fs::File, fmt, slice, ffi, ptr};
 use std::str::FromStr;
 use std::io::{self, Write, BufReader, BufRead};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use error::XGBError;
 use dmatrix::DMatrix;
@@ -10,6 +10,7 @@ use std::os::unix::ffi::OsStrExt;
 
 use xgboost_sys;
 use tempfile;
+use indexmap::IndexMap;
 
 use super::XGBResult;
 use parameters::{BoosterParameters, TrainingParameters};
@@ -168,7 +169,7 @@ impl Booster {
                         let margin = bst.predict_margin(dmat)?;
                         let eval_result = eval_fn(&margin, dmat);
                         let mut eval_results = dmat_eval_results.entry(eval_name.to_string())
-                            .or_insert_with(BTreeMap::new);
+                            .or_insert_with(IndexMap::new);
                         eval_results.insert(dmat_name.to_string(), eval_result);
                     }
                 }
@@ -246,7 +247,7 @@ impl Booster {
                                                      grad_vec.len() as u64))
     }
 
-    fn eval_set(&self, evals: &[(&DMatrix, &str)], iteration: i32) -> XGBResult<BTreeMap<String, BTreeMap<String, f32>>> {
+    fn eval_set(&self, evals: &[(&DMatrix, &str)], iteration: i32) -> XGBResult<IndexMap<String, IndexMap<String, f32>>> {
         let (dmats, names) = {
             let mut dmats = Vec::with_capacity(evals.len());
             let mut names = Vec::with_capacity(evals.len());
@@ -289,10 +290,17 @@ impl Booster {
     /// See parameter::learning::EvaluationMetric for a full list.
     ///
     /// Returns a map of evaluation metric name to score.
-    pub fn evaluate(&self, dmat: &DMatrix) -> XGBResult<BTreeMap<String, f32>> {
+    pub fn evaluate(&self, dmat: &DMatrix) -> XGBResult<HashMap<String, f32>> {
         let name = "default";
         let mut eval = self.eval_set(&[(dmat, name)], 0)?;
-        Ok(eval.remove(name).unwrap())
+        let mut result = HashMap::new();
+        eval.remove(name).unwrap()
+            .into_iter()
+            .for_each(|(k, v)| {
+                result.insert(k.to_owned(), v);
+            });
+
+        Ok(result)
     }
 
     /// Get a string attribute that was previously set for this model.
@@ -517,9 +525,10 @@ impl Booster {
         xgb_call!(xgboost_sys::XGBoosterSetParam(self.handle, name.as_ptr(), value.as_ptr()))
     }
 
-    fn parse_eval_string(eval: &str, evnames: &[&str]) -> BTreeMap<String, BTreeMap<String, f32>> {
-        let mut result: BTreeMap<String, BTreeMap<String, f32>> = BTreeMap::new();
+    fn parse_eval_string(eval: &str, evnames: &[&str]) -> IndexMap<String, IndexMap<String, f32>> {
+        let mut result: IndexMap<String, IndexMap<String, f32>> = IndexMap::new();
 
+        debug!("Parsing evaluation line: {}", &eval);
         for part in eval.split('\t').skip(1) {
             for evname in evnames {
                 if part.starts_with(evname) {
@@ -529,12 +538,13 @@ impl Booster {
                     let score = metric_parts[1].parse::<f32>()
                         .unwrap_or_else(|_| panic!("Unable to parse XGBoost metrics output: {}", eval));
 
-                    let mut metric_map = result.entry(evname.to_string()).or_insert_with(BTreeMap::new);
+                    let mut metric_map = result.entry(evname.to_string()).or_insert_with(IndexMap::new);
                     metric_map.insert(metric.to_owned(), score);
                 }
             }
         }
 
+        debug!("result: {:?}", &result);
         result
     }
 
@@ -720,7 +730,7 @@ mod tests {
         let params = parameters::BoosterParametersBuilder::default()
             .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
-            .silent(true)
+            .verbose(false)
             .build()
             .unwrap();
         let mut booster = Booster::new_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
@@ -794,7 +804,7 @@ mod tests {
         let params = parameters::BoosterParametersBuilder::default()
             .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
-            .silent(true)
+            .verbose(false)
             .build()
             .unwrap();
         let mut booster = Booster::new_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
@@ -827,7 +837,7 @@ mod tests {
         let params = parameters::BoosterParametersBuilder::default()
             .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
-            .silent(true)
+            .verbose(false)
             .build()
             .unwrap();
         let mut booster = Booster::new_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
@@ -861,7 +871,7 @@ mod tests {
         let params = parameters::BoosterParametersBuilder::default()
             .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
-            .silent(true)
+            .verbose(false)
             .build()
             .unwrap();
         let mut booster = Booster::new_with_cached_dmats(&params, &[&dmat_train, &dmat_test]).unwrap();
@@ -880,13 +890,13 @@ mod tests {
     #[test]
     fn parse_eval_string() {
         let s = "[0]\ttrain-map@4-:0.5\ttrain-logloss:1.0\ttest-map@4-:0.25\ttest-logloss:0.75";
-        let mut metrics = BTreeMap::new();
+        let mut metrics = IndexMap::new();
 
-        let mut train_metrics = BTreeMap::new();
+        let mut train_metrics = IndexMap::new();
         train_metrics.insert("map@4-".to_owned(), 0.5);
         train_metrics.insert("logloss".to_owned(), 1.0);
 
-        let mut test_metrics = BTreeMap::new();
+        let mut test_metrics = IndexMap::new();
         test_metrics.insert("map@4-".to_owned(), 0.25);
         test_metrics.insert("logloss".to_owned(), 0.75);
 
@@ -909,7 +919,7 @@ mod tests {
         let booster_params = parameters::BoosterParametersBuilder::default()
             .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
-            .silent(true)
+            .verbose(false)
             .build().unwrap();
 
         let training_params = parameters::TrainingParametersBuilder::default()

@@ -11,7 +11,7 @@ static KEY_LABEL: &'static str = "label";
 static KEY_WEIGHT: &'static str = "weight";
 static KEY_BASE_MARGIN: &'static str = "base_margin";
 
-/// Data matrix used throughout XGBoost for training/predicting `Booster` models.
+/// Data matrix used throughout XGBoost for training/predicting [`Booster`](struct.Booster.html) models.
 ///
 /// Matrix should contain a row for every instance to train/test with, and can optionally contain a label (`f32` value)
 /// per instance.

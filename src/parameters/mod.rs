@@ -17,20 +17,23 @@ use super::booster::CustomObjective;
 #[derive(Builder, Clone)]
 #[builder(default)]
 pub struct BoosterParameters {
-    /// Type of booster (tree, linear or DART) to use.
+    /// Type of booster (tree, linear or DART) along with its parameters.
     ///
-    /// Default: [GbTree]`enum.BoosterType.html#variant.GbTree`
+    /// *default*: [`GbTree`](enum.BoosterType.html#variant.GbTree)
     booster_type: booster::BoosterType,
 
+    /// Configuration for the learning objective.
     pub(crate) learning_params: learning::LearningTaskParameters,
 
-    /// Whether to print running messages or not.
-    silent: bool,
-
-    /// Number or parallel threads run xgboost if set.
+    /// Whether to print XGBoost's C library's messages or not.
     ///
-    /// default: max number of threads available
-    nthread: Option<u32>,
+    /// *default*: `false`
+    verbose: bool,
+
+    /// Number of parallel threads XGboost will use (if compiled with multiprocessing support).
+    ///
+    /// *default*: `None` (XGBoost will automatically determing max threads to use)
+    threads: Option<u32>,
 }
 
 impl Default for BoosterParameters {
@@ -38,22 +41,66 @@ impl Default for BoosterParameters {
         BoosterParameters {
             booster_type: booster::BoosterType::default(),
             learning_params: learning::LearningTaskParameters::default(),
-            silent: false,
-            nthread: None,
+            verbose: false,
+            threads: None,
         }
     }
 }
 
 impl BoosterParameters {
+    /// Get type of booster (tree, linear or DART) along with its parameters.
+    pub fn booster_type(&self) -> &booster::BoosterType {
+        &self.booster_type
+    }
+
+    /// Set type of booster (tree, linear or DART) along with its parameters.
+    pub fn set_booster_type<T: Into<booster::BoosterType>>(&mut self, booster_type: T) {
+        self.booster_type = booster_type.into();
+    }
+
+    /// Get configuration for the learning objective.
+    pub fn learning_params(&self) -> &learning::LearningTaskParameters {
+        &self.learning_params
+    }
+
+    /// Set configuration for the learning objective.
+    pub fn set_learning_params<T: Into<learning::LearningTaskParameters>>(&mut self, learning_params: T) {
+        self.learning_params = learning_params.into();
+    }
+
+    /// Check whether verbose output is enabled or not.
+    pub fn verbose(&self) -> bool {
+        self.verbose
+    }
+
+    /// Set to `true` to enable verbose output from XGBoost's C library.
+    pub fn set_verbose(&mut self, verbose: bool) {
+        self.verbose = verbose;
+    }
+
+    /// Get number of parallel threads XGboost will use (if compiled with multiprocessing support).
+    ///
+    /// If `None`, XGBoost will determine the number of threads to use automatically.
+    pub fn threads(&self) -> &Option<u32> {
+        &self.threads
+    }
+
+    /// Set number of parallel threads XGBoost will use (if compiled with multiprocessing support).
+    ///
+    /// If `None`, XGBoost will determine the number of threads to use automatically.
+    pub fn set_threads<T: Into<Option<u32>>>(&mut self, threads: T) {
+        self.threads = threads.into();
+    }
+
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
         let mut v = Vec::new();
 
         v.extend(self.booster_type.as_string_pairs());
         v.extend(self.learning_params.as_string_pairs());
 
-        v.push(("silent".to_owned(), (self.silent as u8).to_string()));
+        v.push(("silent".to_owned(), (!self.verbose as u8).to_string()));
 
-        if let Some(nthread) = self.nthread {
+        if let Some(nthread) = self.threads {
             v.push(("nthread".to_owned(), nthread.to_string()));
         }
 
