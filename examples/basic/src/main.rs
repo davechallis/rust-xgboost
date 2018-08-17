@@ -32,7 +32,7 @@ fn main() {
     let booster_params = parameters::BoosterParametersBuilder::default()
         .booster_type(parameters::BoosterType::Tree(tree_params))
         .learning_params(learning_params)
-        .silent(false)
+        .verbose(true)
         .build().unwrap();
 
     // specify datasets to evaluate against during training

@@ -48,7 +48,6 @@ fn main() {
     let booster_params = parameters::BoosterParametersBuilder::default()
         .learning_params(parameters::learning::LearningTaskParameters::default())
         .booster_type(parameters::BoosterType::Tree(tree_params))
-        .silent(true)
         .build().unwrap();
 
     let training_params = parameters::TrainingParametersBuilder::default()
