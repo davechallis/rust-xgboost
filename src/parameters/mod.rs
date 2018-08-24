@@ -1,4 +1,11 @@
 //! Builders for parameters that control various aspects of training.
+//!
+//! Configuration is based on the documented
+//! [XGBoost Parameters](https://xgboost.readthedocs.io/en/latest/parameter.html), see those for
+//! more details.
+//!
+//! Parameters are generally created through builders that provide sensible defaults, and ensure that
+//! any given settings are valid when built.
 use std::default::Default;
 use std::fmt::{self, Display};
 
