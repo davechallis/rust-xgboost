@@ -133,36 +133,6 @@ pub struct TrainingParameters<'a> {
     // TODO: callbacks
 }
 
-
-///// BoosterParameters for Tweedie Regression.
-//#[derive(Builder)]
-//#[builder(build_fn(validate = "Self::validate"))]
-//#[builder(default)]
-//pub struct TweedieRegressionParameters {
-//    /// Parameter that controls the variance of the Tweedie distribution.
-//    ///
-//    /// * var(y) ~ E(y)^tweedie_variance_power
-//    /// * range: (1.0, 2.0)
-//    /// * set closer to 2 to shift towards a gamma distribution
-//    /// * set closer to 1 to shift towards a Poisson distribution
-//    tweedie_variance_power: f32,
-//}
-//
-//impl Default for TweedieRegressionParameters {
-//    fn default() -> Self {
-//        TweedieRegressionParameters {
-//            tweedie_variance_power: 1.5,
-//        }
-//    }
-//}
-//
-//impl TweedieRegressionParametersBuilder {
-//    fn validate(&self) -> Result<(), String> {
-//        Interval::new_open_open(1.0, 2.0).validate(&self.tweedie_variance_power, "tweedie_variance_power")?;
-//        Ok(())
-//    }
-//}
-
 enum Inclusion {
     Open,
     Closed,
