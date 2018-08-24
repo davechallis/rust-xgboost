@@ -108,29 +108,98 @@ impl BoosterParameters {
     }
 }
 
-type CustomEvaluationMetric = fn(&[f32], &DMatrix) -> f32;
+type CustomEvaluation = fn(&[f32], &DMatrix) -> f32;
 
 /// Parameters used by the [`Booster::train`](../struct.Booster.html#method.train) method for training new models.
 /// Created using [`TrainingParametersBuilder`](struct.TrainingParametersBuilder.html).
 #[derive(Builder, Clone)]
 pub struct TrainingParameters<'a> {
+    /// Matrix used for training model.
     pub(crate) dtrain: &'a DMatrix,
 
+    /// Number of boosting rounds to use during training.
+    ///
+    /// *default*: `10`
     #[builder(default="10")]
     pub(crate) boost_rounds: u32,
 
+    /// Configuration for the booster model that will be trained.
+    ///
+    /// *default*: `BoosterParameters::default()`
     #[builder(default="BoosterParameters::default()")]
     pub(crate) booster_params: BoosterParameters,
 
     #[builder(default="None")]
+    /// Optional list of DMatrix to evaluate against after each boosting round.
+    ///
+    /// Supplied as a list of tuples of (DMatrix, description). The description is used to differentiate between
+    /// different evaluation datasets when output during training.
+    ///
+    /// *default*: `None`
     pub(crate) evaluation_sets: Option<&'a[(&'a DMatrix, &'a str)]>,
 
+    /// Optional custom objective function to use for training.
+    ///
+    /// *default*: `None`
     #[builder(default="None")]
     pub(crate) custom_objective_fn: Option<CustomObjective>,
 
+    /// Optional custom evaluation function to use during training.
+    ///
+    /// *default*: `None`
     #[builder(default="None")]
-    pub(crate) custom_evaluation_fn: Option<CustomEvaluationMetric>,
+    pub(crate) custom_evaluation_fn: Option<CustomEvaluation>,
     // TODO: callbacks
+}
+
+impl <'a> TrainingParameters<'a> {
+    pub fn dtrain(&self) -> &'a DMatrix {
+        &self.dtrain
+    }
+
+    pub fn set_dtrain(&mut self, dtrain: &'a DMatrix) {
+        self.dtrain = dtrain;
+    }
+
+    pub fn boost_rounds(&self) -> u32 {
+        self.boost_rounds
+    }
+
+    pub fn set_boost_rounds(&mut self, boost_rounds: u32) {
+        self.boost_rounds = boost_rounds;
+    }
+
+    pub fn booster_params(&self) -> &BoosterParameters {
+        &self.booster_params
+    }
+
+    pub fn set_booster_params<T: Into<BoosterParameters>>(&mut self, booster_params: T) {
+        self.booster_params = booster_params.into();
+    }
+
+    pub fn evaluation_sets(&self) -> &Option<&'a[(&'a DMatrix, &'a str)]> {
+        &self.evaluation_sets
+    }
+
+    pub fn set_evaluation_sets(&mut self, evaluation_sets: Option<&'a[(&'a DMatrix, &'a str)]>) {
+        self.evaluation_sets = evaluation_sets;
+    }
+
+    pub fn custom_objective_fn(&self) -> &Option<CustomObjective> {
+        &self.custom_objective_fn
+    }
+
+    pub fn set_custom_objective_fn(&mut self, custom_objective_fn: Option<CustomObjective>) {
+        self.custom_objective_fn = custom_objective_fn;
+    }
+
+    pub fn custom_evaluation_fn(&self) -> &Option<CustomEvaluation> {
+        &self.custom_evaluation_fn
+    }
+
+    pub fn set_custom_evaluation_fn(&mut self, custom_evaluation_fn: Option<CustomEvaluation>) {
+        self.custom_evaluation_fn = custom_evaluation_fn;
+    }
 }
 
 enum Inclusion {

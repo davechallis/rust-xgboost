@@ -13,8 +13,8 @@ static KEY_BASE_MARGIN: &'static str = "base_margin";
 
 /// Data matrix used throughout XGBoost for training/predicting [`Booster`](struct.Booster.html) models.
 ///
-/// Matrix should contain a row for every instance to train/test with, and can optionally contain a label (`f32` value)
-/// per instance.
+/// It's used as a container for both features (i.e. a row for every instance), and an optional true label for that
+/// instance (as an `f32` value).
 ///
 /// Can be created files, or from dense or sparse
 /// ([CSR](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format))
@@ -41,8 +41,11 @@ static KEY_BASE_MARGIN: &'static str = "base_margin";
 ///              0.7, 1.0, 0.1, 0.1,
 ///              0.2, 0.0, 0.0, 1.0];
 /// let num_rows = 3;
-/// let dmat = DMatrix::from_dense(data, num_rows).unwrap();
+/// let mut dmat = DMatrix::from_dense(data, num_rows).unwrap();
 /// assert_eq!(dmat.shape(), (3, 4));
+///
+/// // set true labels for each row
+/// dmat.set_labels(&[1.0, 0.0, 1.0]);
 /// ```
 ///
 /// ## Create from sparse CSR matrix
