@@ -51,6 +51,7 @@ fn main() {
         .evaluation_sets(Some(eval_sets))
         .build().unwrap();
 
+    // train a new booster model with given parameters, printing results on evaluation sets
     let booster = Booster::train(&training_params).unwrap();
 
     let y_true = dtest.get_labels().unwrap();

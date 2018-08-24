@@ -4,6 +4,8 @@
 use std;
 use std::default::Default;
 
+use super::Interval;
+
 /// Learning objective used when training a booster model.
 pub enum Objective {
     /// Linear regression.
@@ -54,9 +56,16 @@ pub enum Objective {
     /// Gamma regression with log-link. Output is the mean of the gamma distribution.
     RegGamma,
 
-    // TODO: tweedie params
-    /// Tweedie regression with log-link.
-    RegTweedie,
+    /// Tweedie regression with log-link. Takes an optional **tweedie variance power** parameter
+    /// which controls the variance of the Tweedie distribution.
+    ///
+    /// * Set closer to 2 to shift towards a gamma distribution
+    /// * Set closer to 1 to shift towards a Poisson distribution
+    ///
+    /// *range*: (1, 2)
+    ///
+    /// Set to `None` to use XGBoost's default (currently `1.5`).
+    RegTweedie(Option<f32>),
 }
 
 impl Copy for Objective {}
@@ -82,7 +91,7 @@ impl ToString for Objective {
             Objective::MultiSoftprob(_) => "multi:softprob".to_owned(), // num_class conf must also be set
             Objective::RankPairwise => "rank:pairwise".to_owned(),
             Objective::RegGamma => "reg:gamma".to_owned(),
-            Objective::RegTweedie => "reg:tweedie".to_owned(),
+            Objective::RegTweedie(_) => "reg:tweedie".to_owned(),
         }
     }
 }
@@ -208,6 +217,7 @@ impl ToString for EvaluationMetric {
 /// See [`LearningTaskParametersBuilder`](struct.LearningTaskParametersBuilder.html), for details
 /// on parameters.
 #[derive(Builder, Clone)]
+#[builder(build_fn(validate = "Self::validate"))]
 #[builder(default)]
 pub struct LearningTaskParameters {
     /// Learning objective used when training.
@@ -282,6 +292,8 @@ impl LearningTaskParameters {
             v.push(("num_class".to_owned(), n.to_string()));
         } else if let Objective::MultiSoftprob(n) = self.objective {
             v.push(("num_class".to_owned(), n.to_string()));
+        } else if let Objective::RegTweedie(Some(n)) = self.objective {
+            v.push(("tweedie_variance_power".to_owned(), n.to_string()));
         }
 
         v.push(("objective".to_owned(), self.objective.to_string()));
@@ -295,5 +307,14 @@ impl LearningTaskParameters {
         }
 
         v
+    }
+}
+
+impl LearningTaskParametersBuilder {
+    fn validate(&self) -> Result<(), String> {
+        if let Some(Objective::RegTweedie(variance_power)) = self.objective {
+            Interval::new_closed_closed(1.0, 2.0).validate(&variance_power, "tweedie_variance_power")?;
+        }
+        Ok(())
     }
 }

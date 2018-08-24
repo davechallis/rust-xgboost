@@ -1,7 +1,7 @@
 extern crate xgboost;
 extern crate ndarray;
 
-use xgboost::{parameters, parameters::learning::EvaluationMetric, DMatrix, Booster};
+use xgboost::{parameters, DMatrix, Booster};
 
 fn main() {
     // load train and test matrices from text files (in LibSVM format)
@@ -52,6 +52,7 @@ fn main() {
 
     let training_params = parameters::TrainingParametersBuilder::default()
         .dtrain(&dtrain)
+        .booster_params(booster_params)
         .boost_rounds(2)
         .evaluation_sets(Some(&evaluation_sets))
         .custom_objective_fn(Some(log_reg_obj))
