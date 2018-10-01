@@ -2,11 +2,22 @@ extern crate bindgen;
 
 use std::process::Command;
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
-    let xgb_root = std::fs::canonicalize("xgboost").unwrap();
     let target = env::var("TARGET").unwrap();
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let xgb_root = Path::new(&out_dir).join("xgboost");
+
+    // copy source code into OUT_DIR for compilation if it doesn't exist
+    if !xgb_root.exists() {
+        Command::new("cp")
+            .args(&["-r", "xgboost", xgb_root.to_str().unwrap()])
+            .status()
+            .unwrap_or_else(|e| {
+                panic!("Failed to copy ./xgboost to {}: {}", xgb_root.display(), e);
+            });
+    }
 
     // TODO: allow for dynamic/static linking
     // TODO: check whether rabit should be built/linked
@@ -18,6 +29,8 @@ fn main() {
             .status()
             .expect("Failed to execute XGBoost build.sh script.");
     }
+
+    let xgb_root = xgb_root.canonicalize().unwrap();
 
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
