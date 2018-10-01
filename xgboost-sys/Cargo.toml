@@ -7,6 +7,7 @@ build = "build.rs"
 license = "MIT"
 repository = "https://github.com/davechallis/rust-xgboost"
 description = "Native bindings to the xgboost library"
+readme = "README.md"
 
 [dependencies]
 libc = "0.2"
