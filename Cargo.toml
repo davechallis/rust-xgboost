@@ -9,7 +9,7 @@ description = "Machine learning using XGBoost"
 documentation = "https://docs.rs/xgboost"
 
 [dependencies]
-xgboost-sys = { path = "xgboost-sys", version = "0.1.0" }
+xgboost-sys = "0.1"
 libc = "0.2"
 derive_builder = "0.5"
 log = "0.4"
