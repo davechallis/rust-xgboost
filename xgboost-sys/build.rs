@@ -1,37 +1,12 @@
 extern crate bindgen;
-extern crate git2;
 
 use std::process::Command;
 use std::env;
 use std::path::PathBuf;
 
-// Contains symlinks, so cannot be included as a git submodule and packaged with cargo. Downloaded
-// at build time instead.
-static XGBOOST_SRC: &str = "https://github.com/dmlc/xgboost.git";
-static XGBOOST_SPEC: &str = "refs/tags/v0.80";
-
 fn main() {
-    let target = env::var("TARGET").expect("Failed to read TARGET environment variable");
-
-    let xgb_root = std::path::Path::new("xgboost");
-
-    let repo = {
-        if !xgb_root.exists() {
-            match git2::Repository::clone_recurse(XGBOOST_SRC, "xgboost") {
-                Ok(repo) => repo,
-                Err(e) => panic!("failed to clone: {}", e),
-            }
-        } else {
-            match git2::Repository::open("xgboost") {
-                Ok(repo) => repo,
-                Err(e) => panic!("failed to open: {}", e),
-            }
-        }
-    };
-
-    repo.set_head(XGBOOST_SPEC).expect("failed to set head");
-
-    let xgb_root = xgb_root.canonicalize().unwrap();
+    let xgb_root = std::fs::canonicalize("xgboost").unwrap();
+    let target = env::var("TARGET").unwrap();
 
     // TODO: allow for dynamic/static linking
     // TODO: check whether rabit should be built/linked
