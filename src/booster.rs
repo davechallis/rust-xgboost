@@ -106,6 +106,16 @@ impl Booster {
         Ok(Booster { handle })
     }
 
+    /// Load a Booster directly from a buffer.
+    pub fn load_buffer(bytes: &[u8]) -> XGBResult<Self> {
+        debug!("Loading Booster from buffer (length = {})", bytes.len());
+
+        let mut handle = ptr::null_mut();
+        xgb_call!(xgboost_sys::XGBoosterCreate(ptr::null(), 0, &mut handle))?;
+        xgb_call!(xgboost_sys::XGBoosterLoadModelFromBuffer(handle, bytes.as_ptr() as *const _, bytes.len() as u64))?;
+        Ok(Booster { handle })
+    }
+
     /// Convenience function for creating/training a new Booster.
     ///
     /// This does the following:
@@ -688,6 +698,26 @@ mod tests {
         assert_eq!(attr, None);
 
         booster.set_attribute("foo", "bar").expect("Setting attribute failed");
+        let attr = booster.get_attribute("foo").expect("Getting attribute failed");
+        assert_eq!(attr, Some("bar".to_owned()));
+    }
+
+    #[test]
+    fn save_and_load_from_buffer() {
+        let mut booster = load_test_booster();
+        let attr = booster.get_attribute("foo").expect("Getting attribute failed");
+        assert_eq!(attr, None);
+
+        booster.set_attribute("foo", "bar").expect("Setting attribute failed");
+        let attr = booster.get_attribute("foo").expect("Getting attribute failed");
+        assert_eq!(attr, Some("bar".to_owned()));
+
+        let mut dir = tempfile::tempdir().expect("create temp dir");
+        let path = dir.path().join("test-xgboost-model");
+        booster.save(&path).expect("saving booster");
+        drop(booster);
+        let bytes = std::fs::read(&path).expect("read saved booster file");
+        let booster = Booster::load_buffer(&bytes[..]).expect("load booster from buffer");
         let attr = booster.get_attribute("foo").expect("Getting attribute failed");
         assert_eq!(attr, Some("bar".to_owned()));
     }
