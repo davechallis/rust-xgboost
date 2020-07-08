@@ -300,6 +300,11 @@ pub struct TreeBoosterParameters {
     /// default: 1.0
     scale_pos_weight: f32,
 
+    /// Sequence of tree updaters to run, providing a modular way to construct and to modify the trees.
+    ///
+    /// * default: vec![]
+    updater: Vec<TreeUpdater>,
+
     /// This is a parameter of the ‘refresh’ updater plugin. When this flag is true, tree leafs as well as tree nodes'
     /// stats are updated. When it is false, only node stats are updated.
     ///
@@ -355,6 +360,7 @@ impl Default for TreeBoosterParameters {
             tree_method: TreeMethod::default(),
             sketch_eps: 0.03,
             scale_pos_weight: 1.0,
+            updater: Vec::new(),
             refresh_leaf: true,
             process_type: ProcessType::default(),
             grow_policy: GrowPolicy::default(),
@@ -393,6 +399,15 @@ impl TreeBoosterParameters {
         v.push(("max_bin".to_owned(), self.max_bin.to_string()));
         v.push(("num_parallel_tree".to_owned(), self.num_parallel_tree.to_string()));
         v.push(("predictor".to_owned(), self.predictor.to_string()));
+
+        // Don't pass anything to XGBoost if the user didn't specify anything.
+        // This allows XGBoost to figure it out on it's own, and suppresses the
+        // warning message during training.
+        // See: https://github.com/davechallis/rust-xgboost/issues/7
+        if self.updater.len() != 0
+        {
+          v.push(("updater".to_owned(), self.updater.iter().map(|u| u.to_string()).collect::<Vec<String>>().join(",")));
+        }
 
         v
     }
