@@ -53,6 +53,32 @@ impl Default for TreeMethod {
     fn default() -> Self { TreeMethod::Auto }
 }
 
+impl From<String> for TreeMethod
+{
+    fn from(s: String) -> Self
+    {
+      use std::borrow::Borrow;
+      Self::from(s.borrow())
+    }
+}
+
+impl<'a> From<&'a str> for TreeMethod
+{
+    fn from(s: &'a str) -> Self
+    {
+      match s
+      {
+        "auto" => TreeMethod::Auto,
+        "exact" => TreeMethod::Exact,
+        "approx" => TreeMethod::Approx,
+        "hist" => TreeMethod::Hist,
+        "gpu_exact" => TreeMethod::GpuExact,
+        "gpu_hist" => TreeMethod::GpuHist,
+        _ => panic!("no known tree_method for {}", s)
+      }
+    }
+}
+
 /// Provides a modular way to construct and to modify the trees. This is an advanced parameter that is usually set
 /// automatically, depending on some other parameters. However, it could be also set explicitly by a user.
 #[derive(Clone)]
@@ -191,7 +217,7 @@ pub struct TreeBoosterParameters {
     ///
     /// * range: [0,∞]
     /// * default: 0
-    gamma: u32,
+    gamma: f32,
 
     /// Maximum depth of a tree, increase this value will make the model more complex / likely to be overfitting.
     /// 0 indicates no limit, limit is required for depth-wise grow policy.
@@ -208,7 +234,7 @@ pub struct TreeBoosterParameters {
     ///
     /// * range: [0,∞]
     /// * default: 1
-    min_child_weight: u32,
+    min_child_weight: f32,
 
     /// Maximum delta step we allow each tree’s weight estimation to be.
     /// If the value is set to 0, it means there is no constraint. If it is set to a positive value,
@@ -218,7 +244,7 @@ pub struct TreeBoosterParameters {
     ///
     /// * range: [0,∞]
     /// * default: 0
-    max_delta_step: u32,
+    max_delta_step: f32,
 
     /// Subsample ratio of the training instance. Setting it to 0.5 means that XGBoost randomly collected half
     /// of the data instances to grow trees and this will prevent overfitting.
@@ -239,15 +265,21 @@ pub struct TreeBoosterParameters {
     /// * default: 1.0
     colsample_bylevel: f32,
 
+    /// Subsample ratio of columns for each node.
+    ///
+    /// * range: (0.0, 1.0]
+    /// * default: 1.0
+    colsample_bynode: f32,
+
     /// L2 regularization term on weights, increase this value will make model more conservative.
     ///
     /// * default: 1
-    lambda: u32,
+    lambda: f32,
 
     /// L1 regularization term on weights, increase this value will make model more conservative.
     ///
     /// * default: 0
-    alpha: u32,
+    alpha: f32,
 
     /// The tree construction algorithm used in XGBoost.
     #[builder(default = "TreeMethod::default()")]
@@ -270,7 +302,7 @@ pub struct TreeBoosterParameters {
 
     /// Sequence of tree updaters to run, providing a modular way to construct and to modify the trees.
     ///
-    /// * default: [TreeUpdater::GrowColMaker, TreeUpdater::Prune]
+    /// * default: vec![]
     updater: Vec<TreeUpdater>,
 
     /// This is a parameter of the ‘refresh’ updater plugin. When this flag is true, tree leafs as well as tree nodes'
@@ -300,6 +332,11 @@ pub struct TreeBoosterParameters {
     /// * default: 256
     max_bin: u32,
 
+    /// Number of trees to train in parallel for boosted random forest.
+    ///
+    /// * default: 1
+    num_parallel_tree: u32,
+
     /// The type of predictor algorithm to use. Provides the same results but allows the use of GPU or CPU.
     ///
     /// * default: [`Predictor::Cpu`](enum.Predictor.html#variant.Cpu)
@@ -310,24 +347,26 @@ impl Default for TreeBoosterParameters {
     fn default() -> Self {
         TreeBoosterParameters {
             eta: 0.3,
-            gamma: 0,
+            gamma: 0.0,
             max_depth: 6,
-            min_child_weight: 1,
-            max_delta_step: 0,
+            min_child_weight: 1.0,
+            max_delta_step: 0.0,
             subsample: 1.0,
             colsample_bytree: 1.0,
             colsample_bylevel: 1.0,
-            lambda: 1,
-            alpha: 0,
+            colsample_bynode: 1.0,
+            lambda: 1.0,
+            alpha: 0.0,
             tree_method: TreeMethod::default(),
             sketch_eps: 0.03,
             scale_pos_weight: 1.0,
-            updater: vec![TreeUpdater::GrowColMaker, TreeUpdater::Prune],
+            updater: Vec::new(),
             refresh_leaf: true,
             process_type: ProcessType::default(),
             grow_policy: GrowPolicy::default(),
             max_leaves: 0,
             max_bin: 256,
+            num_parallel_tree: 1,
             predictor: Predictor::default(),
         }
     }
@@ -347,18 +386,28 @@ impl TreeBoosterParameters {
         v.push(("subsample".to_owned(), self.subsample.to_string()));
         v.push(("colsample_bytree".to_owned(), self.colsample_bytree.to_string()));
         v.push(("colsample_bylevel".to_owned(), self.colsample_bylevel.to_string()));
+        v.push(("colsample_bynode".to_owned(), self.colsample_bynode.to_string()));
         v.push(("lambda".to_owned(), self.lambda.to_string()));
         v.push(("alpha".to_owned(), self.alpha.to_string()));
         v.push(("tree_method".to_owned(), self.tree_method.to_string()));
         v.push(("sketch_eps".to_owned(), self.sketch_eps.to_string()));
         v.push(("scale_pos_weight".to_owned(), self.scale_pos_weight.to_string()));
-        v.push(("updater".to_owned(), self.updater.iter().map(|u| u.to_string()).collect::<Vec<String>>().join(",")));
         v.push(("refresh_leaf".to_owned(), (self.refresh_leaf as u8).to_string()));
         v.push(("process_type".to_owned(), self.process_type.to_string()));
         v.push(("grow_policy".to_owned(), self.grow_policy.to_string()));
         v.push(("max_leaves".to_owned(), self.max_leaves.to_string()));
         v.push(("max_bin".to_owned(), self.max_bin.to_string()));
+        v.push(("num_parallel_tree".to_owned(), self.num_parallel_tree.to_string()));
         v.push(("predictor".to_owned(), self.predictor.to_string()));
+
+        // Don't pass anything to XGBoost if the user didn't specify anything.
+        // This allows XGBoost to figure it out on it's own, and suppresses the
+        // warning message during training.
+        // See: https://github.com/davechallis/rust-xgboost/issues/7
+        if self.updater.len() != 0
+        {
+          v.push(("updater".to_owned(), self.updater.iter().map(|u| u.to_string()).collect::<Vec<String>>().join(",")));
+        }
 
         v
     }
@@ -370,6 +419,7 @@ impl TreeBoosterParametersBuilder {
         Interval::new_open_closed(0.0, 1.0).validate(&self.subsample, "subsample")?;
         Interval::new_open_closed(0.0, 1.0).validate(&self.colsample_bytree, "colsample_bytree")?;
         Interval::new_open_closed(0.0, 1.0).validate(&self.colsample_bylevel, "colsample_bylevel")?;
+        Interval::new_open_closed(0.0, 1.0).validate(&self.colsample_bynode, "colsample_bynode")?;
         Interval::new_open_open(0.0, 1.0).validate(&self.sketch_eps, "sketch_eps")?;
         Ok(())
     }
