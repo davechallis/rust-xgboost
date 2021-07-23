@@ -13,4 +13,4 @@ readme = "README.md"
 libc = "0.2"
 
 [build-dependencies]
-bindgen = "0.36"
+bindgen = "0.59"
