@@ -73,7 +73,7 @@ fn download_dataset<P: AsRef<Path>>(dst: P) {
     }
 
     debug!("Fetching training dataset from {}", url);
-    let mut response = reqwest::get(url).expect("failed to download training set data");
+    let mut response = reqwest::blocking::get(url).expect("failed to download training set data");
 
     let file = File::create(dst).expect(&format!("failed to create file {}", dst.display()));
     let mut writer = BufWriter::new(file);
