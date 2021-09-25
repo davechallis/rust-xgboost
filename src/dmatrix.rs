@@ -1,6 +1,7 @@
 use std::{slice, ffi, ptr, path::Path};
 use libc::{c_uint, c_float};
 use std::os::unix::ffi::OsStrExt;
+use std::convert::TryInto;
 
 use xgboost_sys;
 
@@ -123,7 +124,7 @@ impl DMatrix {
     /// `data[indptr[i]:indptr[i+1]`.
     ///
     /// If `num_cols` is set to None, number of columns will be inferred from given data.
-    pub fn from_csr(indptr: &[usize], indices: &[usize], data: &[f32], num_cols: Option<usize>) -> XGBResult<Self> {
+    pub fn from_csr(indptr: &[u64], indices: &[usize], data: &[f32], num_cols: Option<usize>) -> XGBResult<Self> {
         assert_eq!(indices.len(), data.len());
         let mut handle = ptr::null_mut();
         let indices: Vec<u32> = indices.iter().map(|x| *x as u32).collect();
@@ -131,9 +132,9 @@ impl DMatrix {
         xgb_call!(xgboost_sys::XGDMatrixCreateFromCSREx(indptr.as_ptr(),
                                                         indices.as_ptr(),
                                                         data.as_ptr(),
-                                                        indptr.len(),
-                                                        data.len(),
-                                                        num_cols,
+                                                        indptr.len().try_into().unwrap(),
+                                                        data.len().try_into().unwrap(),
+                                                        num_cols.try_into().unwrap(),
                                                         &mut handle))?;
         Ok(DMatrix::new(handle)?)
     }
@@ -146,7 +147,7 @@ impl DMatrix {
     /// `data[indptr[i]:indptr[i+1]`.
     ///
     /// If `num_rows` is set to None, number of rows will be inferred from given data.
-    pub fn from_csc(indptr: &[usize], indices: &[usize], data: &[f32], num_rows: Option<usize>) -> XGBResult<Self> {
+    pub fn from_csc(indptr: &[u64], indices: &[usize], data: &[f32], num_rows: Option<usize>) -> XGBResult<Self> {
         assert_eq!(indices.len(), data.len());
         let mut handle = ptr::null_mut();
         let indices: Vec<u32> = indices.iter().map(|x| *x as u32).collect();
@@ -154,9 +155,9 @@ impl DMatrix {
         xgb_call!(xgboost_sys::XGDMatrixCreateFromCSCEx(indptr.as_ptr(),
                                                         indices.as_ptr(),
                                                         data.as_ptr(),
-                                                        indptr.len(),
-                                                        data.len(),
-                                                        num_rows,
+                                                        indptr.len().try_into().unwrap(),
+                                                        data.len().try_into().unwrap(),
+                                                        num_rows.try_into().unwrap(),
                                                         &mut handle))?;
         Ok(DMatrix::new(handle)?)
     }

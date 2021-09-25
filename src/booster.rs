@@ -178,7 +178,7 @@ impl Booster {
                     for (dmat, dmat_name) in eval_sets {
                         let margin = bst.predict_margin(dmat)?;
                         let eval_result = eval_fn(&margin, dmat);
-                        let mut eval_results = dmat_eval_results.entry(eval_name.to_string())
+                        let eval_results = dmat_eval_results.entry(eval_name.to_string())
                             .or_insert_with(IndexMap::new);
                         eval_results.insert(dmat_name.to_string(), eval_result);
                     }
@@ -188,7 +188,7 @@ impl Booster {
                 let mut eval_dmat_results = BTreeMap::new();
                 for (dmat_name, eval_results) in &dmat_eval_results {
                     for (eval_name, result) in eval_results {
-                        let mut dmat_results = eval_dmat_results.entry(eval_name).or_insert_with(BTreeMap::new);
+                        let dmat_results = eval_dmat_results.entry(eval_name).or_insert_with(BTreeMap::new);
                         dmat_results.insert(dmat_name, result);
                     }
                 }
@@ -548,7 +548,7 @@ impl Booster {
                     let score = metric_parts[1].parse::<f32>()
                         .unwrap_or_else(|_| panic!("Unable to parse XGBoost metrics output: {}", eval));
 
-                    let mut metric_map = result.entry(evname.to_string()).or_insert_with(IndexMap::new);
+                    let metric_map = result.entry(evname.to_string()).or_insert_with(IndexMap::new);
                     metric_map.insert(metric.to_owned(), score);
                 }
             }
