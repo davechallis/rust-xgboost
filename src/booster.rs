@@ -361,6 +361,7 @@ impl Booster {
                                                 dmat.handle,
                                                 option_mask,
                                                 ntree_limit,
+                                                0,
                                                 &mut out_len,
                                                 &mut out_result))?;
 
@@ -381,10 +382,10 @@ impl Booster {
                                                 dmat.handle,
                                                 option_mask,
                                                 ntree_limit,
+                                                1,
                                                 &mut out_len,
                                                 &mut out_result))?;
         assert!(!out_result.is_null());
-
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         Ok(data)
     }
@@ -403,6 +404,7 @@ impl Booster {
                                                 dmat.handle,
                                                 option_mask,
                                                 ntree_limit,
+                                                0,
                                                 &mut out_len,
                                                 &mut out_result))?;
         assert!(!out_result.is_null());
@@ -429,6 +431,7 @@ impl Booster {
                                                 dmat.handle,
                                                 option_mask,
                                                 ntree_limit,
+                                                0,
                                                 &mut out_len,
                                                 &mut out_result))?;
         assert!(!out_result.is_null());
@@ -456,6 +459,7 @@ impl Booster {
                                                 dmat.handle,
                                                 option_mask,
                                                 ntree_limit,
+                                                0,
                                                 &mut out_len,
                                                 &mut out_result))?;
         assert!(!out_result.is_null());
