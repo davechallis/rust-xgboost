@@ -1,5 +1,5 @@
 [submodule "xgboost-sys/xgboost"]
 	path = xgboost-sys/xgboost
-	url = git@github.com:davechallis/xgboost
+	url = https://github.com/davechallis/xgboost
 	branch = v0.80-modified
 	ignore = dirty
