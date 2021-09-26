@@ -2,3 +2,4 @@
 	path = xgboost-sys/xgboost
 	url = git@github.com:davechallis/xgboost
 	branch = v0.80-modified
+	ignore = dirty
