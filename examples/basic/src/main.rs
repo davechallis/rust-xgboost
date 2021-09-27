@@ -97,7 +97,7 @@ fn main() {
     let mut data = Vec::new();
 
     let reader = BufReader::new(File::open("../../xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap());
-    let mut current_row: u64 = 0;
+    let mut current_row = 0;
     for line in reader.lines() {
         let line = line.unwrap();
         let sample: Vec<&str> = line.split_whitespace().collect();
@@ -106,7 +106,7 @@ fn main() {
         for entry in &sample[1..] {
             let pair: Vec<&str> = entry.split(':').collect();
             rows.push(current_row);
-            cols.push(pair[0].parse::<u64>().unwrap());
+            cols.push(pair[0].parse::<usize>().unwrap());
             data.push(pair[1].parse::<f32>().unwrap());
         }
 
@@ -116,11 +116,12 @@ fn main() {
     // work out size of sparse matrix from max row/col values
     let shape = ((*rows.iter().max().unwrap() + 1) as usize,
                  (*cols.iter().max().unwrap() + 1) as usize);
+    let num_col = Some((*cols.iter().max().unwrap() + 1) as usize);
     let triplet_mat = sprs::TriMatBase::from_triplets(shape, rows, cols, data);
     let csr_mat = triplet_mat.to_csr();
 
     let indices: Vec<usize> = csr_mat.indices().into_iter().map(|i| *i as usize).collect();
-    let mut dtrain = DMatrix::from_csr(csr_mat.indptr(), &indices, csr_mat.data(), None).unwrap();
+    let mut dtrain = DMatrix::from_csr(csr_mat.indptr().raw_storage(), &indices, csr_mat.data(), num_col).unwrap();
     dtrain.set_labels(&labels).unwrap();
 
     let training_params = parameters::TrainingParametersBuilder::default().dtrain(&dtrain).build().unwrap();

@@ -124,9 +124,10 @@ impl DMatrix {
     /// `data[indptr[i]:indptr[i+1]`.
     ///
     /// If `num_cols` is set to None, number of columns will be inferred from given data.
-    pub fn from_csr(indptr: &[u64], indices: &[usize], data: &[f32], num_cols: Option<usize>) -> XGBResult<Self> {
+    pub fn from_csr(indptr: &[usize], indices: &[usize], data: &[f32], num_cols: Option<usize>) -> XGBResult<Self> {
         assert_eq!(indices.len(), data.len());
         let mut handle = ptr::null_mut();
+        let indptr: Vec<u64> = indptr.iter().map(|x| *x as u64).collect();
         let indices: Vec<u32> = indices.iter().map(|x| *x as u32).collect();
         let num_cols = num_cols.unwrap_or(0); // infer from data if 0
         xgb_call!(xgboost_sys::XGDMatrixCreateFromCSREx(indptr.as_ptr(),
@@ -147,9 +148,10 @@ impl DMatrix {
     /// `data[indptr[i]:indptr[i+1]`.
     ///
     /// If `num_rows` is set to None, number of rows will be inferred from given data.
-    pub fn from_csc(indptr: &[u64], indices: &[usize], data: &[f32], num_rows: Option<usize>) -> XGBResult<Self> {
+    pub fn from_csc(indptr: &[usize], indices: &[usize], data: &[f32], num_rows: Option<usize>) -> XGBResult<Self> {
         assert_eq!(indices.len(), data.len());
         let mut handle = ptr::null_mut();
+        let indptr: Vec<u64> = indptr.iter().map(|x| *x as u64).collect();
         let indices: Vec<u32> = indices.iter().map(|x| *x as u32).collect();
         let num_rows = num_rows.unwrap_or(0); // infer from data if 0
         xgb_call!(xgboost_sys::XGDMatrixCreateFromCSCEx(indptr.as_ptr(),
