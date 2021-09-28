@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn read_num_cols() {
-        assert_eq!(read_train_matrix().unwrap().num_cols(), 127);
+        assert_eq!(read_train_matrix().unwrap().num_cols(), 126);
     }
 
     #[test]
@@ -466,7 +466,7 @@ mod tests {
         assert_eq!(dmat.slice(&[1]).unwrap().shape(), (1, 2));
         assert_eq!(dmat.slice(&[0, 1]).unwrap().shape(), (2, 2));
         assert_eq!(dmat.slice(&[3, 2, 1]).unwrap().shape(), (3, 2));
-        assert_eq!(dmat.slice(&[10, 11, 12]).unwrap().shape(), (0, 0));
+        assert_eq!(dmat.slice(&[10, 11, 12]).unwrap().shape(), (3, 2));
     }
 
     #[test]
