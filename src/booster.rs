@@ -361,6 +361,7 @@ impl Booster {
                                                 dmat.handle,
                                                 option_mask,
                                                 ntree_limit,
+                                                0,
                                                 &mut out_len,
                                                 &mut out_result))?;
 
@@ -381,10 +382,10 @@ impl Booster {
                                                 dmat.handle,
                                                 option_mask,
                                                 ntree_limit,
+                                                1,
                                                 &mut out_len,
                                                 &mut out_result))?;
         assert!(!out_result.is_null());
-
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         Ok(data)
     }
@@ -403,6 +404,7 @@ impl Booster {
                                                 dmat.handle,
                                                 option_mask,
                                                 ntree_limit,
+                                                0,
                                                 &mut out_len,
                                                 &mut out_result))?;
         assert!(!out_result.is_null());
@@ -429,6 +431,7 @@ impl Booster {
                                                 dmat.handle,
                                                 option_mask,
                                                 ntree_limit,
+                                                0,
                                                 &mut out_len,
                                                 &mut out_result))?;
         assert!(!out_result.is_null());
@@ -456,6 +459,7 @@ impl Booster {
                                                 dmat.handle,
                                                 option_mask,
                                                 ntree_limit,
+                                                0,
                                                 &mut out_len,
                                                 &mut out_result))?;
         assert!(!out_result.is_null());
@@ -623,7 +627,6 @@ impl FeatureMap {
             };
             features.0.insert(feature_num, (feature_name.to_string(), feature_type));
         }
-
         Ok(features)
     }
 }
@@ -704,7 +707,8 @@ mod tests {
 
     #[test]
     fn save_and_load_from_buffer() {
-        let mut booster = load_test_booster();
+        let dmat_train = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap();
+        let mut booster = Booster::new_with_cached_dmats(&BoosterParameters::default(), &[&dmat_train]).unwrap();
         let attr = booster.get_attribute("foo").expect("Getting attribute failed");
         assert_eq!(attr, None);
 
@@ -939,6 +943,8 @@ mod tests {
     fn dump_model() {
         let dmat_train = DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap();
 
+        println!("{:?}", dmat_train.shape());
+
         let tree_params = tree::TreeBoosterParametersBuilder::default()
             .max_depth(2)
             .eta(1.0)
@@ -963,75 +969,75 @@ mod tests {
             .expect("failed to parse feature map file");
 
         assert_eq!(booster.dump_model(true, Some(&features)).unwrap(),
-"0:[odor=pungent] yes=2,no=1,gain=4000.53101,cover=1628.25
-	1:[stalk-root=cup] yes=4,no=3,gain=1158.21204,cover=924.5
+"0:[odor=none] yes=2,no=1,gain=4000.53101,cover=1628.25
+1:[stalk-root=club] yes=4,no=3,gain=1158.21204,cover=924.5
 		3:leaf=1.71217716,cover=812
 		4:leaf=-1.70044053,cover=112.5
-	2:[spore-print-color=orange] yes=6,no=5,gain=198.173828,cover=703.75
+2:[spore-print-color=green] yes=6,no=5,gain=198.173828,cover=703.75
 		5:leaf=-1.94070864,cover=690.5
 		6:leaf=1.85964918,cover=13.25
 
-0:[stalk-root=missing] yes=2,no=1,gain=832.545044,cover=788.852051
-	1:[odor=pungent] yes=4,no=3,gain=569.725098,cover=768.389709
+0:[stalk-root=rooted] yes=2,no=1,gain=832.545044,cover=788.852051
+1:[odor=none] yes=4,no=3,gain=569.725098,cover=768.389709
 		3:leaf=0.78471756,cover=458.936859
 		4:leaf=-0.968530357,cover=309.45282
 	2:leaf=-6.23624468,cover=20.462389
 
-0:[ring-type=sheathing] yes=2,no=1,gain=368.744568,cover=457.069458
-	1:[stalk-surface-below-ring=silky] yes=4,no=3,gain=226.33696,cover=221.051468
+0:[ring-type=pendant] yes=2,no=1,gain=368.744568,cover=457.069458
+1:[stalk-surface-below-ring=scaly] yes=4,no=3,gain=226.33696,cover=221.051468
 		3:leaf=0.658725023,cover=212.999451
 		4:leaf=5.77228642,cover=8.05200672
-	2:[spore-print-color=white] yes=6,no=5,gain=258.184265,cover=236.018005
+2:[spore-print-color=purple] yes=6,no=5,gain=258.184265,cover=236.018005
 		5:leaf=-0.791407049,cover=233.487625
 		6:leaf=-9.421422,cover=2.53038669
 
-0:[odor=musty] yes=2,no=1,gain=140.486069,cover=364.119354
-	1:[gill-size=narrow] yes=4,no=3,gain=139.860504,cover=274.101959
+0:[odor=foul] yes=2,no=1,gain=140.486069,cover=364.119354
+1:[gill-size=broad] yes=4,no=3,gain=139.860504,cover=274.101959
 		3:leaf=0.614153326,cover=95.8599854
 		4:leaf=-0.877905607,cover=178.241974
 	2:leaf=1.07747853,cover=90.0174103
 
-0:[spore-print-color=orange] yes=2,no=1,gain=112.605011,cover=189.202194
-	1:[gill-spacing=crowded] yes=4,no=3,gain=66.4029999,cover=177.771835
+0:[spore-print-color=green] yes=2,no=1,gain=112.605011,cover=189.202194
+1:[gill-spacing=close] yes=4,no=3,gain=66.4029999,cover=177.771835
 		3:leaf=-1.26934469,cover=42.277401
 		4:leaf=0.152607277,cover=135.494431
 	2:leaf=2.92190909,cover=11.4303684
 
-0:[odor=anise] yes=2,no=1,gain=52.5610275,cover=170.612762
-	1:[odor=creosote] yes=4,no=3,gain=67.3869553,cover=150.881165
+0:[odor=almond] yes=2,no=1,gain=52.5610275,cover=170.612762
+1:[odor=anise] yes=4,no=3,gain=67.3869553,cover=150.881165
 		3:leaf=0.431742132,cover=131.902222
 		4:leaf=-1.53846073,cover=18.9789505
-	2:[gill-spacing=crowded] yes=6,no=5,gain=12.4420624,cover=19.731596
+2:[gill-spacing=close] yes=6,no=5,gain=12.4420624,cover=19.731596
 		5:leaf=-3.02413678,cover=3.65769386
 		6:leaf=-1.02315068,cover=16.0739021
 
-0:[odor=pungent] yes=2,no=1,gain=66.2389145,cover=142.360611
-	1:[odor=creosote] yes=4,no=3,gain=31.2294312,cover=72.7557373
+0:[odor=none] yes=2,no=1,gain=66.2389145,cover=142.360611
+1:[odor=anise] yes=4,no=3,gain=31.2294312,cover=72.7557373
 		3:leaf=0.777142286,cover=64.5309982
 		4:leaf=-1.19710124,cover=8.22473907
-	2:[spore-print-color=orange] yes=6,no=5,gain=12.1987419,cover=69.6048737
+2:[spore-print-color=green] yes=6,no=5,gain=12.1987419,cover=69.6048737
 		5:leaf=-0.912605286,cover=66.1211166
 		6:leaf=0.836115122,cover=3.48375821
 
-0:[gill-size=narrow] yes=2,no=1,gain=20.6531773,cover=79.4027634
-	1:[spore-print-color=yellow] yes=4,no=3,gain=16.0703697,cover=34.9289207
+0:[gill-size=broad] yes=2,no=1,gain=20.6531773,cover=79.4027634
+1:[spore-print-color=white] yes=4,no=3,gain=16.0703697,cover=34.9289207
 		3:leaf=-0.0180106498,cover=25.0319824
 		4:leaf=1.4361918,cover=9.89693928
-	2:[odor=musty] yes=6,no=5,gain=22.1144333,cover=44.4738464
+2:[odor=foul] yes=6,no=5,gain=22.1144333,cover=44.4738464
 		5:leaf=-0.908311546,cover=36.982872
 		6:leaf=0.890622675,cover=7.49097395
 
-0:[odor=anise] yes=2,no=1,gain=11.7128553,cover=53.3251991
-	1:[ring-type=sheathing] yes=4,no=3,gain=12.546154,cover=44.299942
+0:[odor=almond] yes=2,no=1,gain=11.7128553,cover=53.3251991
+1:[ring-type=pendant] yes=4,no=3,gain=12.546154,cover=44.299942
 		3:leaf=-0.515293062,cover=15.7899179
 		4:leaf=0.56883812,cover=28.5100231
 	2:leaf=-1.01502442,cover=9.02525806
 
-0:[population=numerous] yes=2,no=1,gain=14.8892794,cover=45.9312019
-	1:[odor=pungent] yes=4,no=3,gain=10.1308851,cover=43.0564575
+0:[population=clustered] yes=2,no=1,gain=14.8892794,cover=45.9312019
+1:[odor=none] yes=4,no=3,gain=10.1308851,cover=43.0564575
 		3:leaf=0.217203051,cover=22.3283749
 		4:leaf=-0.734555721,cover=20.7280827
-	2:[stalk-surface-above-ring=fibrous] yes=6,no=5,gain=19.3462334,cover=2.87474418
+2:[stalk-root=missing] yes=6,no=5,gain=19.3462334,cover=2.87474418
 		5:leaf=3.63442755,cover=1.34154534
 		6:leaf=-0.609474957,cover=1.53319895
 ");

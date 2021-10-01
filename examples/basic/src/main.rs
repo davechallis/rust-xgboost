@@ -114,13 +114,14 @@ fn main() {
     }
 
     // work out size of sparse matrix from max row/col values
-    let shape = (*rows.iter().max().unwrap() + 1 as usize,
-                 *cols.iter().max().unwrap() + 1 as usize);
+    let shape = ((*rows.iter().max().unwrap() + 1) as usize,
+                 (*cols.iter().max().unwrap() + 1) as usize);
+    let num_col = Some((*cols.iter().max().unwrap() + 1) as usize);
     let triplet_mat = sprs::TriMatBase::from_triplets(shape, rows, cols, data);
     let csr_mat = triplet_mat.to_csr();
 
     let indices: Vec<usize> = csr_mat.indices().into_iter().map(|i| *i as usize).collect();
-    let mut dtrain = DMatrix::from_csr(csr_mat.indptr(), &indices, csr_mat.data(), None).unwrap();
+    let mut dtrain = DMatrix::from_csr(csr_mat.indptr().raw_storage(), &indices, csr_mat.data(), num_col).unwrap();
     dtrain.set_labels(&labels).unwrap();
 
     let training_params = parameters::TrainingParametersBuilder::default().dtrain(&dtrain).build().unwrap();

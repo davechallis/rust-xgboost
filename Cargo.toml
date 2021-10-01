@@ -1,6 +1,6 @@
 [package]
 name = "xgboost"
-version = "0.1.4"
+version = "0.2.0"
 authors = ["Dave Challis <dave@suicas.net>"]
 license = "MIT"
 repository = "https://github.com/davechallis/rust-xgboost"
@@ -10,7 +10,7 @@ documentation = "https://docs.rs/xgboost"
 readme = "README.md"
 
 [dependencies]
-xgboost-sys = "0.1.2"
+xgboost-sys = "0.2.0"
 libc = "0.2"
 derive_builder = "0.5"
 log = "0.4"

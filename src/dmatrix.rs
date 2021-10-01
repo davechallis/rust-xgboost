@@ -1,12 +1,14 @@
 use std::{slice, ffi, ptr, path::Path};
 use libc::{c_uint, c_float};
 use std::os::unix::ffi::OsStrExt;
+use std::convert::TryInto;
 
 use xgboost_sys;
 
 use super::{XGBResult, XGBError};
 
-static KEY_ROOT_INDEX: &'static str = "root_index";
+static KEY_GROUP_PTR: &'static str = "group_ptr";
+static KEY_GROUP: &'static str = "group";
 static KEY_LABEL: &'static str = "label";
 static KEY_WEIGHT: &'static str = "weight";
 static KEY_BASE_MARGIN: &'static str = "base_margin";
@@ -126,14 +128,15 @@ impl DMatrix {
     pub fn from_csr(indptr: &[usize], indices: &[usize], data: &[f32], num_cols: Option<usize>) -> XGBResult<Self> {
         assert_eq!(indices.len(), data.len());
         let mut handle = ptr::null_mut();
+        let indptr: Vec<u64> = indptr.iter().map(|x| *x as u64).collect();
         let indices: Vec<u32> = indices.iter().map(|x| *x as u32).collect();
         let num_cols = num_cols.unwrap_or(0); // infer from data if 0
         xgb_call!(xgboost_sys::XGDMatrixCreateFromCSREx(indptr.as_ptr(),
                                                         indices.as_ptr(),
                                                         data.as_ptr(),
-                                                        indptr.len(),
-                                                        data.len(),
-                                                        num_cols,
+                                                        indptr.len().try_into().unwrap(),
+                                                        data.len().try_into().unwrap(),
+                                                        num_cols.try_into().unwrap(),
                                                         &mut handle))?;
         Ok(DMatrix::new(handle)?)
     }
@@ -149,14 +152,15 @@ impl DMatrix {
     pub fn from_csc(indptr: &[usize], indices: &[usize], data: &[f32], num_rows: Option<usize>) -> XGBResult<Self> {
         assert_eq!(indices.len(), data.len());
         let mut handle = ptr::null_mut();
+        let indptr: Vec<u64> = indptr.iter().map(|x| *x as u64).collect();
         let indices: Vec<u32> = indices.iter().map(|x| *x as u32).collect();
         let num_rows = num_rows.unwrap_or(0); // infer from data if 0
         xgb_call!(xgboost_sys::XGDMatrixCreateFromCSCEx(indptr.as_ptr(),
                                                         indices.as_ptr(),
                                                         data.as_ptr(),
-                                                        indptr.len(),
-                                                        data.len(),
-                                                        num_rows,
+                                                        indptr.len().try_into().unwrap(),
+                                                        data.len().try_into().unwrap(),
+                                                        num_rows.try_into().unwrap(),
                                                         &mut handle))?;
         Ok(DMatrix::new(handle)?)
     }
@@ -227,20 +231,6 @@ impl DMatrix {
         Ok(DMatrix::new(out_handle)?)
     }
 
-    /// Gets the specified root index of each instance, can be used for multi task setting.
-    ///
-    /// See the XGBoost documentation for more information.
-    pub fn get_root_index(&self) -> XGBResult<&[u32]> {
-        self.get_uint_info(KEY_ROOT_INDEX)
-    }
-
-    /// Sets the specified root index of each instance, can be used for multi task setting.
-    ///
-    /// See the XGBoost documentation for more information.
-    pub fn set_root_index(&mut self, array: &[u32]) -> XGBResult<()> {
-        self.set_uint_info(KEY_ROOT_INDEX, array)
-    }
-
     /// Get ground truth labels for each row of this matrix.
     pub fn get_labels(&self) -> XGBResult<&[f32]> {
         self.get_float_info(KEY_LABEL)
@@ -279,8 +269,19 @@ impl DMatrix {
     ///
     /// See the XGBoost documentation for more information.
     pub fn set_group(&mut self, group: &[u32]) -> XGBResult<()> {
-        xgb_call!(xgboost_sys::XGDMatrixSetGroup(self.handle, group.as_ptr(), group.len() as u64))
+        // same as xgb_call!(xgboost_sys::XGDMatrixSetGroup(self.handle, group.as_ptr(), group.len() as u64))
+        self.set_uint_info(KEY_GROUP, group)
     }
+
+    /// Get the index for the beginning and end of a group.
+    ///
+    /// Needed when the learning task is ranking.
+    ///
+    /// See the XGBoost documentation for more information.
+    pub fn get_group(&self) -> XGBResult<&[u32]> {
+        self.get_uint_info(KEY_GROUP_PTR)
+    }
+
 
     fn get_float_info(&self, field: &str) -> XGBResult<&[f32]> {
         let field = ffi::CString::new(field).unwrap();
@@ -310,7 +311,6 @@ impl DMatrix {
                                                     field.as_ptr(),
                                                     &mut out_len,
                                                     &mut out_dptr))?;
-
         Ok(unsafe { slice::from_raw_parts(out_dptr as *mut c_uint, out_len as usize) })
     }
 
@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn read_num_cols() {
-        assert_eq!(read_train_matrix().unwrap().num_cols(), 127);
+        assert_eq!(read_train_matrix().unwrap().num_cols(), 126);
     }
 
     #[test]
@@ -368,16 +368,6 @@ mod tests {
     }
 
     #[test]
-    fn get_set_root_index() {
-        let mut dmat = read_train_matrix().unwrap();
-        assert_eq!(dmat.get_root_index().unwrap(), &[]);
-
-        let root_index = [3, 22, 1];
-        assert!(dmat.set_root_index(&root_index).is_ok());
-        assert_eq!(dmat.get_root_index().unwrap(), &[3, 22, 1]);
-    }
-
-    #[test]
     fn get_set_labels() {
         let mut dmat = read_train_matrix().unwrap();
         assert_eq!(dmat.get_labels().unwrap().len(), 6513);
@@ -392,7 +382,7 @@ mod tests {
         let mut dmat = read_train_matrix().unwrap();
         assert_eq!(dmat.get_weights().unwrap(), &[]);
 
-        let weight = [1.0, 10.0, -123.456789, 44.9555];
+        let weight = [1.0, 10.0, 44.9555];
         assert!(dmat.set_weights(&weight).is_ok());
         assert_eq!(dmat.get_weights().unwrap(), weight);
     }
@@ -408,11 +398,13 @@ mod tests {
     }
 
     #[test]
-    fn set_group() {
+    fn get_set_group() {
         let mut dmat = read_train_matrix().unwrap();
+        assert_eq!(dmat.get_group().unwrap(), &[]);
 
-        let group = [1, 2, 3];
+        let group = [1];
         assert!(dmat.set_group(&group).is_ok());
+        assert_eq!(dmat.get_group().unwrap(), &[0, 1]);
     }
 
     #[test]
@@ -423,7 +415,7 @@ mod tests {
 
         let dmat = DMatrix::from_csr(&indptr, &indices, &data, None).unwrap();
         assert_eq!(dmat.num_rows(), 4);
-        assert_eq!(dmat.num_cols(), 3);
+        assert_eq!(dmat.num_cols(), 0);  // https://github.com/dmlc/xgboost/pull/7265
 
         let dmat = DMatrix::from_csr(&indptr, &indices, &data, Some(10)).unwrap();
         assert_eq!(dmat.num_rows(), 4);
@@ -474,7 +466,7 @@ mod tests {
         assert_eq!(dmat.slice(&[1]).unwrap().shape(), (1, 2));
         assert_eq!(dmat.slice(&[0, 1]).unwrap().shape(), (2, 2));
         assert_eq!(dmat.slice(&[3, 2, 1]).unwrap().shape(), (3, 2));
-        assert!(dmat.slice(&[10, 11, 12]).is_err());
+        assert_eq!(dmat.slice(&[10, 11, 12]).unwrap().shape(), (3, 2));
     }
 
     #[test]
