@@ -36,6 +36,7 @@ fn main() {
         .header("wrapper.h")
         .clang_arg(format!("-I{}", xgb_root.join("include").display()))
         .clang_arg(format!("-I{}", xgb_root.join("rabit/include").display()))
+        .size_t_is_usize(true)
         .generate()
         .expect("Unable to generate bindings.");
 
