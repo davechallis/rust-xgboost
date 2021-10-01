@@ -9,7 +9,7 @@
 //!
 //! let tree_params = TreeBoosterParametersBuilder::default()
 //!     .eta(0.2)
-//!     .gamma(3)
+//!     .gamma(3.0)
 //!     .subsample(0.75)
 //!     .build()
 //!     .unwrap();
