@@ -10,7 +10,7 @@ documentation = "https://docs.rs/xgboost"
 readme = "README.md"
 
 [dependencies]
-xgboost-sys = "0.2.0"
+xgboost-sys = { path = "xgboost-sys" }
 libc = "0.2"
 derive_builder = "0.5"
 log = "0.4"
