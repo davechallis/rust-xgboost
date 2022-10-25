@@ -25,6 +25,9 @@ fn main() {
     let dst = Config::new(&xgb_root)
         .uses_cxx11()
         .define("BUILD_STATIC_LIB", "ON")
+        .define("USE_CUDA", "ON")
+        .define("BUILD_WITH_CUDA", "ON")
+        .define("BUILD_WITH_CUDA_CUB", "ON")
         .build();
 
     let xgb_root = xgb_root.canonicalize().unwrap();
@@ -34,7 +37,11 @@ fn main() {
         .clang_args(&["-x", "c++", "-std=c++11"])
         .clang_arg(format!("-I{}", xgb_root.join("include").display()))
         .clang_arg(format!("-I{}", xgb_root.join("rabit/include").display()))
-        .clang_arg(format!("-I{}", xgb_root.join("dmlc-core/include").display()))
+        .clang_arg(format!("-I{}", xgb_root.join("dmlc-core/include").display()));
+
+    #[cfg(feature = "cuda")]
+    let bindings = bindings.clang_arg("-I/usr/local/cuda/include");
+    let bindings = bindings
         .generate()
         .expect("Unable to generate bindings.");
 
@@ -60,4 +67,12 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", dst.join("lib").display());
     println!("cargo:rustc-link-lib=static=dmlc");
     println!("cargo:rustc-link-lib=static=xgboost");
+
+    #[cfg(feature = "cuda")]
+    {
+        println!("cargo:rustc-link-search={}", "/usr/local/cuda/lib64");
+        println!("cargo:rustc-link-search={}", "/usr/local/cuda/lib64/stubs");
+        println!("cargo:rustc-link-lib=dylib=cuda");
+        println!("cargo:rustc-link-lib=dylib=cudart");
+    }
 }

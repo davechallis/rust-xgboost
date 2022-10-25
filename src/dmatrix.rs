@@ -128,7 +128,6 @@ impl DMatrix {
     pub fn from_csr(indptr: &[usize], indices: &[usize], data: &[f32], num_cols: Option<usize>) -> XGBResult<Self> {
         assert_eq!(indices.len(), data.len());
         let mut handle = ptr::null_mut();
-        let indptr: Vec<u64> = indptr.iter().map(|x| *x as u64).collect();
         let indices: Vec<u32> = indices.iter().map(|x| *x as u32).collect();
         let num_cols = num_cols.unwrap_or(0); // infer from data if 0
         xgb_call!(xgboost_sys::XGDMatrixCreateFromCSREx(indptr.as_ptr(),
@@ -152,7 +151,6 @@ impl DMatrix {
     pub fn from_csc(indptr: &[usize], indices: &[usize], data: &[f32], num_rows: Option<usize>) -> XGBResult<Self> {
         assert_eq!(indices.len(), data.len());
         let mut handle = ptr::null_mut();
-        let indptr: Vec<u64> = indptr.iter().map(|x| *x as u64).collect();
         let indices: Vec<u32> = indices.iter().map(|x| *x as u32).collect();
         let num_rows = num_rows.unwrap_or(0); // infer from data if 0
         xgb_call!(xgboost_sys::XGDMatrixCreateFromCSCEx(indptr.as_ptr(),
@@ -349,7 +347,7 @@ mod tests {
 
     #[test]
     fn read_num_cols() {
-        assert_eq!(read_train_matrix().unwrap().num_cols(), 126);
+        assert_eq!(read_train_matrix().unwrap().num_cols(), 127);
     }
 
     #[test]
@@ -380,7 +378,7 @@ mod tests {
     #[test]
     fn get_set_weights() {
         let mut dmat = read_train_matrix().unwrap();
-        assert_eq!(dmat.get_weights().unwrap(), &[]);
+        assert!(dmat.get_weights().unwrap().is_empty());
 
         let weight = [1.0, 10.0, 44.9555];
         assert!(dmat.set_weights(&weight).is_ok());
@@ -390,9 +388,12 @@ mod tests {
     #[test]
     fn get_set_base_margin() {
         let mut dmat = read_train_matrix().unwrap();
-        assert_eq!(dmat.get_base_margin().unwrap(), &[]);
+        assert!(dmat.get_base_margin().unwrap().is_empty());
 
         let base_margin = [0.00001, 0.000002, 1.23];
+        println!("rows: {:?}, {:?}", dmat.num_rows(), base_margin.len());
+        let result = dmat.set_base_margin(&base_margin);
+        println!("{:?}", result);
         assert!(dmat.set_base_margin(&base_margin).is_ok());
         assert_eq!(dmat.get_base_margin().unwrap(), base_margin);
     }
@@ -400,7 +401,7 @@ mod tests {
     #[test]
     fn get_set_group() {
         let mut dmat = read_train_matrix().unwrap();
-        assert_eq!(dmat.get_group().unwrap(), &[]);
+        assert!(dmat.get_group().unwrap().is_empty());
 
         let group = [1];
         assert!(dmat.set_group(&group).is_ok());
