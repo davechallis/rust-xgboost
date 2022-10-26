@@ -16,3 +16,6 @@ derive_builder = "0.5"
 log = "0.4"
 tempfile = "3.0"
 indexmap = "1.0"
+
+[features]
+cuda = ["xgboost-sys/cuda"]
