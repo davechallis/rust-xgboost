@@ -78,8 +78,6 @@ fn main() {
     #[cfg(feature = "cuda")]
     {
         println!("cargo:rustc-link-search={}", "/usr/local/cuda/lib64");
-        println!("cargo:rustc-link-search={}", "/usr/local/cuda/lib64/stubs");
-        println!("cargo:rustc-link-lib=dylib=cuda");
-        println!("cargo:rustc-link-lib=dylib=cudart");
+        println!("cargo:rustc-link-lib=static=cudart_static");
     }
 }
