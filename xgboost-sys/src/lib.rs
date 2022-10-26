@@ -26,7 +26,7 @@ mod tests {
         let mut num_cols = 0;
         let ret_val = unsafe { XGDMatrixNumCol(handle, &mut num_cols) };
         assert_eq!(ret_val, 0);
-        assert_eq!(num_cols, 127);
+        assert_eq!(num_cols, 126);
 
         let ret_val = unsafe { XGDMatrixFree(handle) };
         assert_eq!(ret_val, 0);

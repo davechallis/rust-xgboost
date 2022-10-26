@@ -774,12 +774,12 @@ mod tests {
         }
 
         let train_metrics = booster.evaluate(&dmat_train).unwrap();
-        assert_eq!(*train_metrics.get("logloss").unwrap(), 0.006634);
-        assert_eq!(*train_metrics.get("map@4-").unwrap(), 0.001274);
+        assert_eq!(*train_metrics.get("logloss").unwrap(), 0.006634271);
+        assert_eq!(*train_metrics.get("map@4-").unwrap(), 0.0012738854);
 
         let test_metrics = booster.evaluate(&dmat_test).unwrap();
-        assert_eq!(*test_metrics.get("logloss").unwrap(), 0.00692);
-        assert_eq!(*test_metrics.get("map@4-").unwrap(), 0.005155);
+        assert_eq!(*test_metrics.get("logloss").unwrap(), 0.006919953);
+        assert_eq!(*test_metrics.get("map@4-").unwrap(), 0.005154639);
 
         let v = booster.predict(&dmat_test).unwrap();
         assert_eq!(v.len(), dmat_test.num_rows());
