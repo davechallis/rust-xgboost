@@ -533,7 +533,7 @@ impl Booster {
         xgb_call!(xgboost_sys::XGBoosterSaveRabitCheckpoint(self.handle))
     }
 
-    pub(crate) fn set_param(&mut self, name: &str, value: &str) -> XGBResult<()> {
+    pub fn set_param(&mut self, name: &str, value: &str) -> XGBResult<()> {
         let name = ffi::CString::new(name).unwrap();
         let value = ffi::CString::new(value).unwrap();
         xgb_call!(xgboost_sys::XGBoosterSetParam(self.handle, name.as_ptr(), value.as_ptr()))
