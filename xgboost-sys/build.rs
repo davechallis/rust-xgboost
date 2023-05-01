@@ -41,13 +41,15 @@ fn main() {
 
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
-        .derive_default(true)
         .clang_args(&["-x", "c++", "-std=c++11"])
-        .clang_arg(format!("-I/usr/include/c++/11"))
-        .clang_arg(format!("-I/usr/include/x86_64-linux-gnu/c++/11"))
         .clang_arg(format!("-I{}", xgb_root.join("include").display()))
         .clang_arg(format!("-I{}", xgb_root.join("rabit/include").display()))
         .clang_arg(format!("-I{}", xgb_root.join("dmlc-core/include").display()));
+
+    #[cfg(target_os = "linux")]
+    let bindings = bindings
+        .clang_arg(format!("-I/usr/include/c++/11"))
+        .clang_arg(format!("-I/usr/include/x86_64-linux-gnu/c++/11"));
 
     #[cfg(feature = "cuda")]
     let bindings = bindings.clang_arg("-I/usr/local/cuda/include");
