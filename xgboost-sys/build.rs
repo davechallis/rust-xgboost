@@ -63,6 +63,7 @@ fn main() {
         .expect("Couldn't write bindings.");
 
     println!("cargo:rustc-link-search={}", xgb_root.join("lib").display());
+    println!("cargo:rustc-link-search={}", xgb_root.join("lib64").display());
     println!("cargo:rustc-link-search={}", xgb_root.join("rabit/lib").display());
     println!("cargo:rustc-link-search={}", xgb_root.join("dmlc-core").display());
 
@@ -77,6 +78,7 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", dst.display());
     println!("cargo:rustc-link-search=native={}", dst.join("lib").display());
+    println!("cargo:rustc-link-search=native={}", dst.join("lib64").display());
     println!("cargo:rustc-link-lib=static=dmlc");
     println!("cargo:rustc-link-lib=static=xgboost");
 
