@@ -28,14 +28,23 @@ fn main() {
         .define("BUILD_STATIC_LIB", "ON")
         .define("USE_CUDA", "ON")
         .define("BUILD_WITH_CUDA", "ON")
-        .define("BUILD_WITH_CUDA_CUB", "ON")
-        .build();
+        .define("BUILD_WITH_CUDA_CUB", "ON");
 
     #[cfg(not(feature = "cuda"))]
-    let dst = Config::new(&xgb_root)
-        .uses_cxx11()
-        .define("BUILD_STATIC_LIB", "ON")
-        .build();
+    let mut dst = Config::new(&xgb_root);
+
+    let dst = dst.uses_cxx11()
+        .define("BUILD_STATIC_LIB", "ON");
+
+    #[cfg(target_os = "macos")]
+    let dst =
+        dst
+            .define("CMAKE_C_COMPILER", "/opt/homebrew/opt/llvm/bin/clang")
+            .define("CMAKE_CXX_COMPILER", "/opt/homebrew/opt/llvm/bin/clang++")
+            .define("OPENMP_LIBRARIES", "/opt/homebrew/opt/llvm/lib")
+            .define("OPENMP_INCLUDES", "/opt/homebrew/opt/llvm/include");
+
+    let dst = dst.build();
 
     let xgb_root = xgb_root.canonicalize().unwrap();
 
@@ -56,6 +65,10 @@ fn main() {
     let bindings = bindings
         .generate()
         .expect("Unable to generate bindings.");
+
+    #[cfg(targe_os = "darwin")]
+    let bindings = bindings
+        .clang_arg("-L/opt/homebrew/Cellar/libomp/16.0.6/lib/");
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings
