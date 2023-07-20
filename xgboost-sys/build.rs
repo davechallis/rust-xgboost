@@ -66,10 +66,6 @@ fn main() {
         .generate()
         .expect("Unable to generate bindings.");
 
-    #[cfg(targe_os = "darwin")]
-    let bindings = bindings
-        .clang_arg("-L/opt/homebrew/Cellar/libomp/16.0.6/lib/");
-
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings
         .write_to_file(out_path.join("bindings.rs"))
