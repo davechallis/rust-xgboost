@@ -112,7 +112,7 @@ impl DMatrix {
         xgb_call!(xgboost_sys::XGDMatrixCreateFromMat(data.as_ptr(),
                                                       num_rows as xgboost_sys::bst_ulong,
                                                       (data.len() / num_rows) as xgboost_sys::bst_ulong,
-                                                      0.0, // TODO: can values be missing here?
+                                                      f32::NAN,
                                                       &mut handle))?;
         Ok(DMatrix::new(handle)?)
     }
