@@ -20,7 +20,7 @@
 //! ```
 use std::default::Default;
 
-use super::{tree, linear, dart};
+use super::{dart, linear, tree};
 
 /// Type of booster to use when training a [Booster](../struct.Booster.html) model.
 #[derive(Clone)]
@@ -46,7 +46,9 @@ pub enum BoosterType {
 }
 
 impl Default for BoosterType {
-    fn default() -> Self { BoosterType::Tree(tree::TreeBoosterParameters::default()) }
+    fn default() -> Self {
+        BoosterType::Tree(tree::TreeBoosterParameters::default())
+    }
 }
 
 impl BoosterType {
@@ -54,7 +56,7 @@ impl BoosterType {
         match *self {
             BoosterType::Tree(ref p) => p.as_string_pairs(),
             BoosterType::Linear(ref p) => p.as_string_pairs(),
-            BoosterType::Dart(ref p) => p.as_string_pairs()
+            BoosterType::Dart(ref p) => p.as_string_pairs(),
         }
     }
 }

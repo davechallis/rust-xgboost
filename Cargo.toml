@@ -10,9 +10,12 @@ documentation = "https://docs.rs/xgboost"
 readme = "README.md"
 
 [dependencies]
-xgboost-sys = "0.2.0"
+xgboost-sys = { path = "xgboost-sys" }
 libc = "0.2"
-derive_builder = "0.5"
+derive_builder = "0.12"
 log = "0.4"
-tempfile = "3.0"
-indexmap = "1.0"
+tempfile = "3.9"
+indexmap = "2.1"
+
+[features]
+cuda = ["xgboost-sys/cuda"]

@@ -60,10 +60,10 @@
 extern crate derive_builder;
 #[macro_use]
 extern crate log;
-extern crate xgboost_sys;
+extern crate indexmap;
 extern crate libc;
 extern crate tempfile;
-extern crate indexmap;
+extern crate xgboost_sys;
 
 macro_rules! xgb_call {
     ($x:expr) => {
@@ -72,7 +72,7 @@ macro_rules! xgb_call {
 }
 
 mod error;
-pub use error::{XGBResult, XGBError};
+pub use error::{XGBError, XGBResult};
 
 mod dmatrix;
 pub use dmatrix::DMatrix;
