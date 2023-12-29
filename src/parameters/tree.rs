@@ -357,31 +357,30 @@ impl Default for TreeBoosterParameters {
 
 impl TreeBoosterParameters {
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
-        let mut v = Vec::new();
-
-        v.push(("booster".to_owned(), "gbtree".to_owned()));
-
-        v.push(("eta".to_owned(), self.eta.to_string()));
-        v.push(("gamma".to_owned(), self.gamma.to_string()));
-        v.push(("max_depth".to_owned(), self.max_depth.to_string()));
-        v.push(("min_child_weight".to_owned(), self.min_child_weight.to_string()));
-        v.push(("max_delta_step".to_owned(), self.max_delta_step.to_string()));
-        v.push(("subsample".to_owned(), self.subsample.to_string()));
-        v.push(("colsample_bytree".to_owned(), self.colsample_bytree.to_string()));
-        v.push(("colsample_bylevel".to_owned(), self.colsample_bylevel.to_string()));
-        v.push(("colsample_bynode".to_owned(), self.colsample_bynode.to_string()));
-        v.push(("lambda".to_owned(), self.lambda.to_string()));
-        v.push(("alpha".to_owned(), self.alpha.to_string()));
-        v.push(("tree_method".to_owned(), self.tree_method.to_string()));
-        v.push(("sketch_eps".to_owned(), self.sketch_eps.to_string()));
-        v.push(("scale_pos_weight".to_owned(), self.scale_pos_weight.to_string()));
-        v.push(("refresh_leaf".to_owned(), (self.refresh_leaf as u8).to_string()));
-        v.push(("process_type".to_owned(), self.process_type.to_string()));
-        v.push(("grow_policy".to_owned(), self.grow_policy.to_string()));
-        v.push(("max_leaves".to_owned(), self.max_leaves.to_string()));
-        v.push(("max_bin".to_owned(), self.max_bin.to_string()));
-        v.push(("num_parallel_tree".to_owned(), self.num_parallel_tree.to_string()));
-        v.push(("predictor".to_owned(), self.predictor.to_string()));
+        let mut v = vec! [
+            ("booster".to_owned(), "gbtree".to_owned()),
+            ("eta".to_owned(), self.eta.to_string()),
+            ("gamma".to_owned(), self.gamma.to_string()),
+            ("max_depth".to_owned(), self.max_depth.to_string()),
+            ("min_child_weight".to_owned(), self.min_child_weight.to_string()),
+            ("max_delta_step".to_owned(), self.max_delta_step.to_string()),
+            ("subsample".to_owned(), self.subsample.to_string()),
+            ("colsample_bytree".to_owned(), self.colsample_bytree.to_string()),
+            ("colsample_bylevel".to_owned(), self.colsample_bylevel.to_string()),
+            ("colsample_bynode".to_owned(), self.colsample_bynode.to_string()),
+            ("lambda".to_owned(), self.lambda.to_string()),
+            ("alpha".to_owned(), self.alpha.to_string()),
+            ("tree_method".to_owned(), self.tree_method.to_string()),
+            ("sketch_eps".to_owned(), self.sketch_eps.to_string()),
+            ("scale_pos_weight".to_owned(), self.scale_pos_weight.to_string()),
+            ("refresh_leaf".to_owned(), (self.refresh_leaf as u8).to_string()),
+            ("process_type".to_owned(), self.process_type.to_string()),
+            ("grow_policy".to_owned(), self.grow_policy.to_string()),
+            ("max_leaves".to_owned(), self.max_leaves.to_string()),
+            ("max_bin".to_owned(), self.max_bin.to_string()),
+            ("num_parallel_tree".to_owned(), self.num_parallel_tree.to_string()),
+            ("predictor".to_owned(), self.predictor.to_string()),
+        ];
 
         // Don't pass anything to XGBoost if the user didn't specify anything.
         // This allows XGBoost to figure it out on it's own, and suppresses the

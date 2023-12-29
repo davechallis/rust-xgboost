@@ -7,8 +7,10 @@ use std::default::Default;
 use super::Interval;
 
 /// Learning objective used when training a booster model.
+#[derive(Default)]
 pub enum Objective {
     /// Linear regression.
+    #[default]
     RegLinear,
 
     /// Logistic regression.
@@ -98,11 +100,7 @@ impl ToString for Objective {
     }
 }
 
-impl Default for Objective {
-    fn default() -> Self {
-        Objective::RegLinear
-    }
-}
+
 
 /// Type of evaluation metrics to use during learning.
 #[derive(Clone)]

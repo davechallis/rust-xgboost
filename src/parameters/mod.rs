@@ -277,7 +277,7 @@ impl<T: PartialOrd + Display> Interval<T> {
     fn validate(&self, val: &Option<T>, name: &str) -> Result<(), String> {
         match &val {
             Some(ref val) => {
-                if self.contains(&val) {
+                if self.contains(val) {
                     Ok(())
                 } else {
                     Err(format!(
