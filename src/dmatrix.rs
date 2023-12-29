@@ -61,10 +61,10 @@ static KEY_BASE_MARGIN: &str = "base_margin";
 /// ```
 /// use xgboost::DMatrix;
 ///
-/// let indptr = &[0, 2, 3, 6];
+/// let indptr = &[0, 1, 2, 6];
 /// let indices = &[0, 2, 2, 0, 1, 2];
 /// let data = &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
-/// let dmat = DMatrix::from_csr(indptr, indices, data, None).unwrap();
+/// let dmat = DMatrix::from_csc(indptr, indices, data, None).unwrap();
 /// assert_eq!(dmat.shape(), (3, 3));
 /// ```
 #[derive(Debug)]
@@ -199,10 +199,8 @@ impl DMatrix {
         debug!("Loading DMatrix from: {}", path.as_ref().display());
         let mut handle = ptr::null_mut();
         let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
-        let silent = true;
-        xgb_call!(xgboost_sys::XGDMatrixCreateFromFile(
+        xgb_call!(xgboost_sys::XGDMatrixCreateFromURI(
             fname.as_ptr(),
-            silent as i32,
             &mut handle
         ))?;
         DMatrix::new(handle)
