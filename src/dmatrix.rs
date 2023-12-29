@@ -199,23 +199,15 @@ impl DMatrix {
         debug!("Loading DMatrix from: {}", path.as_ref().display());
         let mut handle = ptr::null_mut();
         let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
-        xgb_call!(xgboost_sys::XGDMatrixCreateFromURI(
-            fname.as_ptr(),
-            &mut handle
-        ))?;
+        xgb_call!(xgboost_sys::XGDMatrixCreateFromURI(fname.as_ptr(), &mut handle))?;
         DMatrix::new(handle)
     }
-
 
     pub fn load_binary<P: AsRef<Path>>(path: P) -> XGBResult<Self> {
         debug!("Loading DMatrix from: {}", path.as_ref().display());
         let mut handle = ptr::null_mut();
         let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
-        xgb_call!(xgboost_sys::XGDMatrixCreateFromFile(
-            fname.as_ptr(),
-            1,
-            &mut handle
-        )).unwrap();
+        xgb_call!(xgboost_sys::XGDMatrixCreateFromFile(fname.as_ptr(), 1, &mut handle)).unwrap();
         DMatrix::new(handle)
     }
 

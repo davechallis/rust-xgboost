@@ -761,7 +761,8 @@ mod tests {
 
     #[test]
     fn save_and_load_from_buffer() {
-        let dmat_train = DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
+        let dmat_train =
+            DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
         let mut booster = Booster::new_with_cached_dmats(&BoosterParameters::default(), &[&dmat_train]).unwrap();
         let attr = booster.get_attribute("foo").expect("Getting attribute failed");
         assert_eq!(attr, None);
@@ -804,8 +805,10 @@ mod tests {
 
     #[test]
     fn predict() {
-        let dmat_train = DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
-        let dmat_test =DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.test?format=libsvm"}"#).unwrap();
+        let dmat_train =
+            DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
+        let dmat_test =
+            DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.test?format=libsvm"}"#).unwrap();
 
         let tree_params = tree::TreeBoosterParametersBuilder::default()
             .max_depth(2)
@@ -886,8 +889,10 @@ mod tests {
 
     #[test]
     fn predict_leaf() {
-        let dmat_train = DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
-        let dmat_test = DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.test?format=libsvm"}"#).unwrap();
+        let dmat_train =
+            DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
+        let dmat_test =
+            DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.test?format=libsvm"}"#).unwrap();
 
         let tree_params = tree::TreeBoosterParametersBuilder::default()
             .max_depth(2)
@@ -919,8 +924,10 @@ mod tests {
 
     #[test]
     fn predict_contributions() {
-        let dmat_train = DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
-        let dmat_test = DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.test?format=libsvm"}"#).unwrap();
+        let dmat_train =
+            DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
+        let dmat_test =
+            DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.test?format=libsvm"}"#).unwrap();
 
         let tree_params = tree::TreeBoosterParametersBuilder::default()
             .max_depth(2)
@@ -953,8 +960,10 @@ mod tests {
 
     #[test]
     fn predict_interactions() {
-        let dmat_train = DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
-        let dmat_test = DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.test?format=libsvm"}"#).unwrap();
+        let dmat_train =
+            DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
+        let dmat_test =
+            DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.test?format=libsvm"}"#).unwrap();
 
         let tree_params = tree::TreeBoosterParametersBuilder::default()
             .max_depth(2)
@@ -1005,7 +1014,8 @@ mod tests {
 
     #[test]
     fn dump_model() {
-        let dmat_train = DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
+        let dmat_train =
+            DMatrix::load(r#"{"uri": "xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
 
         println!("{:?}", dmat_train.shape());
 

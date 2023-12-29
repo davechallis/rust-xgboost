@@ -6,8 +6,7 @@ use std::default::Default;
 use super::Interval;
 
 /// Type of sampling algorithm.
-#[derive(Clone)]
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub enum SampleType {
     /// Dropped trees are selected uniformly.
     #[default]
@@ -26,11 +25,8 @@ impl ToString for SampleType {
     }
 }
 
-
-
 /// Type of normalization algorithm.
-#[derive(Clone)]
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub enum NormalizeType {
     /// New trees have the same weight of each of dropped trees.
     /// * weight of new trees are 1 / (k + learning_rate)
@@ -53,8 +49,6 @@ impl ToString for NormalizeType {
         }
     }
 }
-
-
 
 /// Additional parameters for Dart Booster.
 #[derive(Builder, Clone)]
@@ -102,7 +96,7 @@ impl DartBoosterParameters {
             ("normalize_type".to_owned(), self.normalize_type.to_string()),
             ("rate_drop".to_owned(), self.rate_drop.to_string()),
             ("one_drop".to_owned(), (self.one_drop as u8).to_string()),
-            ("skip_drop".to_owned(), self.skip_drop.to_string())
+            ("skip_drop".to_owned(), self.skip_drop.to_string()),
         ]
     }
 }

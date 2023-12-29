@@ -100,8 +100,6 @@ impl ToString for Objective {
     }
 }
 
-
-
 /// Type of evaluation metrics to use during learning.
 #[derive(Clone)]
 pub enum Metrics {

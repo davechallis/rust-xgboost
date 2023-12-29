@@ -3,8 +3,7 @@
 use std::default::Default;
 
 /// Linear model algorithm.
-#[derive(Clone)]
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub enum LinearUpdate {
     /// Parallel coordinate descent algorithm based on shotgun algorithm. Uses ‘hogwild’ parallelism and
     /// therefore produces a nondeterministic solution on each run.
@@ -23,8 +22,6 @@ impl ToString for LinearUpdate {
         }
     }
 }
-
-
 
 /// BoosterParameters for Linear Booster.
 #[derive(Builder, Clone)]

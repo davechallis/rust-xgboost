@@ -357,7 +357,7 @@ impl Default for TreeBoosterParameters {
 
 impl TreeBoosterParameters {
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
-        let mut v = vec! [
+        let mut v = vec![
             ("booster".to_owned(), "gbtree".to_owned()),
             ("eta".to_owned(), self.eta.to_string()),
             ("gamma".to_owned(), self.gamma.to_string()),
