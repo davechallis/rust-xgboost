@@ -71,7 +71,9 @@ pub enum Objective {
 impl Copy for Objective {}
 
 impl Clone for Objective {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl ToString for Objective {
@@ -97,7 +99,9 @@ impl ToString for Objective {
 }
 
 impl Default for Objective {
-    fn default() -> Self { Objective::RegLinear }
+    fn default() -> Self {
+        Objective::RegLinear
+    }
 }
 
 /// Type of evaluation metrics to use during learning.
@@ -191,23 +195,23 @@ impl ToString for EvaluationMetric {
                 } else {
                     format!("error@{}", t)
                 }
-            },
+            }
             EvaluationMetric::MultiClassErrorRate => "merror".to_owned(),
-            EvaluationMetric::MultiClassLogLoss   => "mlogloss".to_owned(),
-            EvaluationMetric::AUC                 => "auc".to_owned(),
-            EvaluationMetric::NDCG                => "ndcg".to_owned(),
-            EvaluationMetric::NDCGCut(n)          => format!("ndcg@{}", n),
-            EvaluationMetric::NDCGNegative        => "ndcg-".to_owned(),
-            EvaluationMetric::NDCGCutNegative(n)  => format!("ndcg@{}-", n),
-            EvaluationMetric::MAP                 => "map".to_owned(),
-            EvaluationMetric::MAPCut(n)           => format!("map@{}", n),
-            EvaluationMetric::MAPNegative         => "map-".to_owned(),
-            EvaluationMetric::MAPCutNegative(n)   => format!("map@{}-", n),
-            EvaluationMetric::PoissonLogLoss      => "poisson-nloglik".to_owned(),
-            EvaluationMetric::GammaLogLoss        => "gamma-nloglik".to_owned(),
-            EvaluationMetric::CoxLogLoss          => "cox-nloglik".to_owned(),
-            EvaluationMetric::GammaDeviance       => "gamma-deviance".to_owned(),
-            EvaluationMetric::TweedieLogLoss      => "tweedie-nloglik".to_owned(),
+            EvaluationMetric::MultiClassLogLoss => "mlogloss".to_owned(),
+            EvaluationMetric::AUC => "auc".to_owned(),
+            EvaluationMetric::NDCG => "ndcg".to_owned(),
+            EvaluationMetric::NDCGCut(n) => format!("ndcg@{}", n),
+            EvaluationMetric::NDCGNegative => "ndcg-".to_owned(),
+            EvaluationMetric::NDCGCutNegative(n) => format!("ndcg@{}-", n),
+            EvaluationMetric::MAP => "map".to_owned(),
+            EvaluationMetric::MAPCut(n) => format!("map@{}", n),
+            EvaluationMetric::MAPNegative => "map-".to_owned(),
+            EvaluationMetric::MAPCutNegative(n) => format!("map@{}-", n),
+            EvaluationMetric::PoissonLogLoss => "poisson-nloglik".to_owned(),
+            EvaluationMetric::GammaLogLoss => "gamma-nloglik".to_owned(),
+            EvaluationMetric::CoxLogLoss => "cox-nloglik".to_owned(),
+            EvaluationMetric::GammaDeviance => "gamma-deviance".to_owned(),
+            EvaluationMetric::TweedieLogLoss => "tweedie-nloglik".to_owned(),
         }
     }
 }

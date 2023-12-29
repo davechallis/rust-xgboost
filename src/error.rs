@@ -1,9 +1,9 @@
 //! Functionality related to errors and error handling.
 
 use std;
+use std::error::Error;
 use std::ffi::CStr;
 use std::fmt::{self, Display};
-use std::error::Error;
 
 use xgboost_sys;
 
@@ -29,9 +29,9 @@ impl XGBError {
     /// Meaning of any other return values are undefined, and will cause a panic.
     pub(crate) fn check_return_value(ret_val: i32) -> XGBResult<()> {
         match ret_val {
-            0  => Ok(()),
+            0 => Ok(()),
             -1 => Err(XGBError::from_xgboost()),
-            _  => panic!("unexpected return value '{}', expected 0 or -1", ret_val),
+            _ => panic!("unexpected return value '{}', expected 0 or -1", ret_val),
         }
     }
 
@@ -39,7 +39,9 @@ impl XGBError {
     fn from_xgboost() -> Self {
         let c_str = unsafe { CStr::from_ptr(xgboost_sys::XGBGetLastError()) };
         let str_slice = c_str.to_str().unwrap();
-        XGBError { desc: str_slice.to_owned() }
+        XGBError {
+            desc: str_slice.to_owned(),
+        }
     }
 }
 

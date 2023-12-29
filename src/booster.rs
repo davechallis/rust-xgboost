@@ -1,16 +1,16 @@
-use libc;
-use std::{fs::File, fmt, slice, ffi, ptr};
-use std::str::FromStr;
-use std::io::{self, Write, BufReader, BufRead};
-use std::collections::{BTreeMap, HashMap};
-use std::path::{Path, PathBuf};
-use error::XGBError;
 use dmatrix::DMatrix;
+use error::XGBError;
+use libc;
+use std::collections::{BTreeMap, HashMap};
+use std::io::{self, BufRead, BufReader, Write};
 use std::os::unix::ffi::OsStrExt;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use std::{ffi, fmt, fs::File, ptr, slice};
 
-use xgboost_sys;
-use tempfile;
 use indexmap::IndexMap;
+use tempfile;
+use xgboost_sys;
 
 use super::XGBResult;
 use parameters::{BoosterParameters, TrainingParameters};
@@ -76,7 +76,11 @@ impl Booster {
         let mut handle = ptr::null_mut();
         // TODO: check this is safe if any dmats are freed
         let s: Vec<xgboost_sys::DMatrixHandle> = dmats.iter().map(|x| x.handle).collect();
-        xgb_call!(xgboost_sys::XGBoosterCreate(s.as_ptr(), dmats.len() as u64, &mut handle))?;
+        xgb_call!(xgboost_sys::XGBoosterCreate(
+            s.as_ptr(),
+            dmats.len() as u64,
+            &mut handle
+        ))?;
 
         let mut booster = Booster { handle };
         booster.set_params(params)?;
@@ -112,7 +116,11 @@ impl Booster {
 
         let mut handle = ptr::null_mut();
         xgb_call!(xgboost_sys::XGBoosterCreate(ptr::null(), 0, &mut handle))?;
-        xgb_call!(xgboost_sys::XGBoosterLoadModelFromBuffer(handle, bytes.as_ptr() as *const _, bytes.len() as u64))?;
+        xgb_call!(xgboost_sys::XGBoosterLoadModelFromBuffer(
+            handle,
+            bytes.as_ptr() as *const _,
+            bytes.len() as u64
+        ))?;
         Ok(Booster { handle })
     }
 
@@ -178,7 +186,8 @@ impl Booster {
                     for (dmat, dmat_name) in eval_sets {
                         let margin = bst.predict_margin(dmat)?;
                         let eval_result = eval_fn(&margin, dmat);
-                        let eval_results = dmat_eval_results.entry(eval_name.to_string())
+                        let eval_results = dmat_eval_results
+                            .entry(eval_name.to_string())
                             .or_insert_with(IndexMap::new);
                         eval_results.insert(dmat_name.to_string(), eval_result);
                     }
@@ -222,7 +231,11 @@ impl Booster {
     /// * `dtrain` - matrix to train the model with for a single iteration
     /// * `iteration` - current iteration number
     pub fn update(&mut self, dtrain: &DMatrix, iteration: i32) -> XGBResult<()> {
-        xgb_call!(xgboost_sys::XGBoosterUpdateOneIter(self.handle, iteration, dtrain.handle))
+        xgb_call!(xgboost_sys::XGBoosterUpdateOneIter(
+            self.handle,
+            iteration,
+            dtrain.handle
+        ))
     }
 
     /// Update this model by training it for one round with a custom objective function.
@@ -241,8 +254,11 @@ impl Booster {
     /// * `hessian` - second order gradient
     fn boost(&mut self, dtrain: &DMatrix, gradient: &[f32], hessian: &[f32]) -> XGBResult<()> {
         if gradient.len() != hessian.len() {
-            let msg = format!("Mismatch between length of gradient and hessian arrays ({} != {})",
-                              gradient.len(), hessian.len());
+            let msg = format!(
+                "Mismatch between length of gradient and hessian arrays ({} != {})",
+                gradient.len(),
+                hessian.len()
+            );
             return Err(XGBError::new(msg));
         }
         assert_eq!(gradient.len(), hessian.len());
@@ -250,14 +266,20 @@ impl Booster {
         // TODO: _validate_feature_names
         let mut grad_vec = gradient.to_vec();
         let mut hess_vec = hessian.to_vec();
-        xgb_call!(xgboost_sys::XGBoosterBoostOneIter(self.handle,
-                                                     dtrain.handle,
-                                                     grad_vec.as_mut_ptr(),
-                                                     hess_vec.as_mut_ptr(),
-                                                     grad_vec.len() as u64))
+        xgb_call!(xgboost_sys::XGBoosterBoostOneIter(
+            self.handle,
+            dtrain.handle,
+            grad_vec.as_mut_ptr(),
+            hess_vec.as_mut_ptr(),
+            grad_vec.len() as u64
+        ))
     }
 
-    fn eval_set(&self, evals: &[(&DMatrix, &str)], iteration: i32) -> XGBResult<IndexMap<String, IndexMap<String, f32>>> {
+    fn eval_set(
+        &self,
+        evals: &[(&DMatrix, &str)],
+        iteration: i32,
+    ) -> XGBResult<IndexMap<String, IndexMap<String, f32>>> {
         let (dmats, names) = {
             let mut dmats = Vec::with_capacity(evals.len());
             let mut names = Vec::with_capacity(evals.len());
@@ -285,12 +307,14 @@ impl Booster {
         evptrs.shrink_to_fit();
 
         let mut out_result = ptr::null();
-        xgb_call!(xgboost_sys::XGBoosterEvalOneIter(self.handle,
-                                                    iteration,
-                                                    s.as_mut_ptr(),
-                                                    evptrs.as_mut_ptr(),
-                                                    dmats.len() as u64,
-                                                    &mut out_result))?;
+        xgb_call!(xgboost_sys::XGBoosterEvalOneIter(
+            self.handle,
+            iteration,
+            s.as_mut_ptr(),
+            evptrs.as_mut_ptr(),
+            dmats.len() as u64,
+            &mut out_result
+        ))?;
         let out = unsafe { ffi::CStr::from_ptr(out_result).to_str().unwrap().to_owned() };
         Ok(Booster::parse_eval_string(&out, &names))
     }
@@ -304,11 +328,9 @@ impl Booster {
         let name = "default";
         let mut eval = self.eval_set(&[(dmat, name)], 0)?;
         let mut result = HashMap::new();
-        eval.remove(name).unwrap()
-            .into_iter()
-            .for_each(|(k, v)| {
-                result.insert(k.to_owned(), v);
-            });
+        eval.remove(name).unwrap().into_iter().for_each(|(k, v)| {
+            result.insert(k.to_owned(), v);
+        });
 
         Ok(result)
     }
@@ -318,7 +340,12 @@ impl Booster {
         let key = ffi::CString::new(key).unwrap();
         let mut out_buf = ptr::null();
         let mut success = 0;
-        xgb_call!(xgboost_sys::XGBoosterGetAttr(self.handle, key.as_ptr(), &mut out_buf, &mut success))?;
+        xgb_call!(xgboost_sys::XGBoosterGetAttr(
+            self.handle,
+            key.as_ptr(),
+            &mut out_buf,
+            &mut success
+        ))?;
         if success == 0 {
             return Ok(None);
         }
@@ -343,7 +370,8 @@ impl Booster {
         xgb_call!(xgboost_sys::XGBoosterGetAttrNames(self.handle, &mut out_len, &mut out))?;
 
         let out_ptr_slice = unsafe { slice::from_raw_parts(out, out_len as usize) };
-        let out_vec = out_ptr_slice.iter()
+        let out_vec = out_ptr_slice
+            .iter()
             .map(|str_ptr| unsafe { ffi::CStr::from_ptr(*str_ptr).to_str().unwrap().to_owned() })
             .collect();
         Ok(out_vec)
@@ -357,13 +385,15 @@ impl Booster {
         let ntree_limit = 0;
         let mut out_len = 0;
         let mut out_result = ptr::null();
-        xgb_call!(xgboost_sys::XGBoosterPredict(self.handle,
-                                                dmat.handle,
-                                                option_mask,
-                                                ntree_limit,
-                                                0,
-                                                &mut out_len,
-                                                &mut out_result))?;
+        xgb_call!(xgboost_sys::XGBoosterPredict(
+            self.handle,
+            dmat.handle,
+            option_mask,
+            ntree_limit,
+            0,
+            &mut out_len,
+            &mut out_result
+        ))?;
 
         assert!(!out_result.is_null());
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
@@ -378,13 +408,15 @@ impl Booster {
         let ntree_limit = 0;
         let mut out_len = 0;
         let mut out_result = ptr::null();
-        xgb_call!(xgboost_sys::XGBoosterPredict(self.handle,
-                                                dmat.handle,
-                                                option_mask,
-                                                ntree_limit,
-                                                1,
-                                                &mut out_len,
-                                                &mut out_result))?;
+        xgb_call!(xgboost_sys::XGBoosterPredict(
+            self.handle,
+            dmat.handle,
+            option_mask,
+            ntree_limit,
+            1,
+            &mut out_len,
+            &mut out_result
+        ))?;
         assert!(!out_result.is_null());
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
         Ok(data)
@@ -400,13 +432,15 @@ impl Booster {
         let ntree_limit = 0;
         let mut out_len = 0;
         let mut out_result = ptr::null();
-        xgb_call!(xgboost_sys::XGBoosterPredict(self.handle,
-                                                dmat.handle,
-                                                option_mask,
-                                                ntree_limit,
-                                                0,
-                                                &mut out_len,
-                                                &mut out_result))?;
+        xgb_call!(xgboost_sys::XGBoosterPredict(
+            self.handle,
+            dmat.handle,
+            option_mask,
+            ntree_limit,
+            0,
+            &mut out_len,
+            &mut out_result
+        ))?;
         assert!(!out_result.is_null());
 
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
@@ -427,13 +461,15 @@ impl Booster {
         let ntree_limit = 0;
         let mut out_len = 0;
         let mut out_result = ptr::null();
-        xgb_call!(xgboost_sys::XGBoosterPredict(self.handle,
-                                                dmat.handle,
-                                                option_mask,
-                                                ntree_limit,
-                                                0,
-                                                &mut out_len,
-                                                &mut out_result))?;
+        xgb_call!(xgboost_sys::XGBoosterPredict(
+            self.handle,
+            dmat.handle,
+            option_mask,
+            ntree_limit,
+            0,
+            &mut out_len,
+            &mut out_result
+        ))?;
         assert!(!out_result.is_null());
 
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
@@ -455,13 +491,15 @@ impl Booster {
         let ntree_limit = 0;
         let mut out_len = 0;
         let mut out_result = ptr::null();
-        xgb_call!(xgboost_sys::XGBoosterPredict(self.handle,
-                                                dmat.handle,
-                                                option_mask,
-                                                ntree_limit,
-                                                0,
-                                                &mut out_len,
-                                                &mut out_result))?;
+        xgb_call!(xgboost_sys::XGBoosterPredict(
+            self.handle,
+            dmat.handle,
+            option_mask,
+            ntree_limit,
+            0,
+            &mut out_len,
+            &mut out_result
+        ))?;
         assert!(!out_result.is_null());
 
         let data = unsafe { slice::from_raw_parts(out_result, out_len as usize).to_vec() };
@@ -507,15 +545,18 @@ impl Booster {
         let format = ffi::CString::new("text").unwrap();
         let mut out_len = 0;
         let mut out_dump_array = ptr::null_mut();
-        xgb_call!(xgboost_sys::XGBoosterDumpModelEx(self.handle,
-                                                    fmap.as_ptr(),
-                                                    with_statistics as i32,
-                                                    format.as_ptr(),
-                                                    &mut out_len,
-                                                    &mut out_dump_array))?;
+        xgb_call!(xgboost_sys::XGBoosterDumpModelEx(
+            self.handle,
+            fmap.as_ptr(),
+            with_statistics as i32,
+            format.as_ptr(),
+            &mut out_len,
+            &mut out_dump_array
+        ))?;
 
         let out_ptr_slice = unsafe { slice::from_raw_parts(out_dump_array, out_len as usize) };
-        let out_vec: Vec<String> = out_ptr_slice.iter()
+        let out_vec: Vec<String> = out_ptr_slice
+            .iter()
             .map(|str_ptr| unsafe { ffi::CStr::from_ptr(*str_ptr).to_str().unwrap().to_owned() })
             .collect();
 
@@ -536,7 +577,11 @@ impl Booster {
     pub fn set_param(&mut self, name: &str, value: &str) -> XGBResult<()> {
         let name = ffi::CString::new(name).unwrap();
         let value = ffi::CString::new(value).unwrap();
-        xgb_call!(xgboost_sys::XGBoosterSetParam(self.handle, name.as_ptr(), value.as_ptr()))
+        xgb_call!(xgboost_sys::XGBoosterSetParam(
+            self.handle,
+            name.as_ptr(),
+            value.as_ptr()
+        ))
     }
 
     fn parse_eval_string(eval: &str, evnames: &[&str]) -> IndexMap<String, IndexMap<String, f32>> {
@@ -546,10 +591,11 @@ impl Booster {
         for part in eval.split('\t').skip(1) {
             for evname in evnames {
                 if part.starts_with(evname) {
-                    let metric_parts: Vec<&str> = part[evname.len()+1..].split(':').into_iter().collect();
+                    let metric_parts: Vec<&str> = part[evname.len() + 1..].split(':').into_iter().collect();
                     assert_eq!(metric_parts.len(), 2);
                     let metric = metric_parts[0];
-                    let score = metric_parts[1].parse::<f32>()
+                    let score = metric_parts[1]
+                        .parse::<f32>()
                         .unwrap_or_else(|_| panic!("Unable to parse XGBoost metrics output: {}", eval));
 
                     let metric_map = result.entry(evname.to_string()).or_insert_with(IndexMap::new);
@@ -561,7 +607,6 @@ impl Booster {
         debug!("result: {:?}", &result);
         result
     }
-
 }
 
 impl Drop for Booster {
@@ -603,16 +648,22 @@ impl FeatureMap {
             let line = line?;
             let parts: Vec<&str> = line.split('\t').collect();
             if parts.len() != 3 {
-                let msg = format!("Unable to parse features from line {}, expected 3 tab separated values", i+1);
+                let msg = format!(
+                    "Unable to parse features from line {}, expected 3 tab separated values",
+                    i + 1
+                );
                 return Err(io::Error::new(io::ErrorKind::InvalidData, msg));
             }
 
             assert_eq!(parts.len(), 3);
             let feature_num: u32 = match parts[0].parse() {
-                Ok(num)  => num,
+                Ok(num) => num,
                 Err(err) => {
-                    let msg = format!("Unable to parse features from line {}, could not parse feature number: {}",
-                                      i+1, err);
+                    let msg = format!(
+                        "Unable to parse features from line {}, could not parse feature number: {}",
+                        i + 1,
+                        err
+                    );
                     return Err(io::Error::new(io::ErrorKind::InvalidData, msg));
                 }
             };
@@ -620,8 +671,8 @@ impl FeatureMap {
             let feature_name = &parts[1];
             let feature_type = match FeatureType::from_str(&parts[2]) {
                 Ok(feature_type) => feature_type,
-                Err(msg)         => {
-                    let msg = format!("Unable to parse features from line {}: {}", i+1, msg);
+                Err(msg) => {
+                    let msg = format!("Unable to parse features from line {}: {}", i + 1, msg);
                     return Err(io::Error::new(io::ErrorKind::InvalidData, msg));
                 }
             };
@@ -648,10 +699,13 @@ impl FromStr for FeatureType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "i"   => Ok(FeatureType::Binary),
-            "q"   => Ok(FeatureType::Quantitative),
+            "i" => Ok(FeatureType::Binary),
+            "q" => Ok(FeatureType::Quantitative),
             "int" => Ok(FeatureType::Integer),
-            _     => Err(format!("unrecognised feature type '{}', must be one of: 'i', 'q', 'int'", s))
+            _ => Err(format!(
+                "unrecognised feature type '{}', must be one of: 'i', 'q', 'int'",
+                s
+            )),
         }
     }
 }
@@ -733,9 +787,13 @@ mod tests {
         assert_eq!(attrs, Vec::<String>::new());
 
         booster.set_attribute("foo", "bar").expect("Setting attribute failed");
-        booster.set_attribute("another", "another").expect("Setting attribute failed");
+        booster
+            .set_attribute("another", "another")
+            .expect("Setting attribute failed");
         booster.set_attribute("4", "4").expect("Setting attribute failed");
-        booster.set_attribute("an even longer attribute name?", "").expect("Setting attribute failed");
+        booster
+            .set_attribute("an even longer attribute name?", "")
+            .expect("Setting attribute failed");
 
         let mut expected = vec!["foo", "another", "4", "an even longer attribute name?"];
         expected.sort();
@@ -756,9 +814,11 @@ mod tests {
             .unwrap();
         let learning_params = learning::LearningTaskParametersBuilder::default()
             .objective(learning::Objective::BinaryLogistic)
-            .eval_metrics(learning::Metrics::Custom(vec![learning::EvaluationMetric::MAPCutNegative(4),
-                                                         learning::EvaluationMetric::LogLoss,
-                                                         learning::EvaluationMetric::BinaryErrorRate(0.5)]))
+            .eval_metrics(learning::Metrics::Custom(vec![
+                learning::EvaluationMetric::MAPCutNegative(4),
+                learning::EvaluationMetric::LogLoss,
+                learning::EvaluationMetric::BinaryErrorRate(0.5),
+            ]))
             .build()
             .unwrap();
         let params = parameters::BoosterParametersBuilder::default()
@@ -785,28 +845,32 @@ mod tests {
         assert_eq!(v.len(), dmat_test.num_rows());
 
         // first 10 predictions
-        let expected_start = [0.0050151693,
-                              0.9884467,
-                              0.0050151693,
-                              0.0050151693,
-                              0.026636455,
-                              0.11789363,
-                              0.9884467,
-                              0.01231471,
-                              0.9884467,
-                              0.00013656063];
+        let expected_start = [
+            0.0050151693,
+            0.9884467,
+            0.0050151693,
+            0.0050151693,
+            0.026636455,
+            0.11789363,
+            0.9884467,
+            0.01231471,
+            0.9884467,
+            0.00013656063,
+        ];
 
         // last 10 predictions
-        let expected_end = [0.002520344,
-                            0.00060917926,
-                            0.99881005,
-                            0.00060917926,
-                            0.00060917926,
-                            0.00060917926,
-                            0.00060917926,
-                            0.9981102,
-                            0.002855195,
-                            0.9981102];
+        let expected_end = [
+            0.002520344,
+            0.00060917926,
+            0.99881005,
+            0.00060917926,
+            0.00060917926,
+            0.00060917926,
+            0.00060917926,
+            0.9981102,
+            0.002855195,
+            0.9981102,
+        ];
         let eps = 1e-6;
 
         for (pred, expected) in v.iter().zip(&expected_start) {
@@ -814,7 +878,7 @@ mod tests {
             assert!(pred - expected < eps);
         }
 
-        for (pred, expected) in v[v.len()-10..].iter().zip(&expected_end) {
+        for (pred, expected) in v[v.len() - 10..].iter().zip(&expected_end) {
             println!("predictions={}, expected={}", pred, expected);
             assert!(pred - expected < eps);
         }
@@ -948,28 +1012,33 @@ mod tests {
         let tree_params = tree::TreeBoosterParametersBuilder::default()
             .max_depth(2)
             .eta(1.0)
-            .build().unwrap();
+            .build()
+            .unwrap();
         let learning_params = learning::LearningTaskParametersBuilder::default()
             .objective(learning::Objective::BinaryLogistic)
-            .build().unwrap();
+            .build()
+            .unwrap();
         let booster_params = parameters::BoosterParametersBuilder::default()
             .booster_type(parameters::BoosterType::Tree(tree_params))
             .learning_params(learning_params)
             .verbose(false)
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         let training_params = parameters::TrainingParametersBuilder::default()
             .booster_params(booster_params)
             .dtrain(&dmat_train)
             .boost_rounds(10)
-            .build().unwrap();
+            .build()
+            .unwrap();
         let booster = Booster::train(&training_params).unwrap();
 
         let features = FeatureMap::from_file("xgboost-sys/xgboost/demo/data/featmap.txt")
             .expect("failed to parse feature map file");
 
-        assert_eq!(booster.dump_model(true, Some(&features)).unwrap(),
-"0:[odor=none] yes=2,no=1,gain=4000.53101,cover=1628.25
+        assert_eq!(
+            booster.dump_model(true, Some(&features)).unwrap(),
+            "0:[odor=none] yes=2,no=1,gain=4000.53101,cover=1628.25
 1:[stalk-root=club] yes=4,no=3,gain=1158.21204,cover=924.5
 		3:leaf=1.71217716,cover=812
 		4:leaf=-1.70044053,cover=112.5
@@ -1040,6 +1109,7 @@ mod tests {
 2:[stalk-root=missing] yes=6,no=5,gain=19.3462334,cover=2.87474418
 		5:leaf=3.63442755,cover=1.34154534
 		6:leaf=-0.609474957,cover=1.53319895
-");
+"
+        );
     }
 }

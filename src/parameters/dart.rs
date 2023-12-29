@@ -25,7 +25,9 @@ impl ToString for SampleType {
 }
 
 impl Default for SampleType {
-    fn default() -> Self { SampleType::Uniform }
+    fn default() -> Self {
+        SampleType::Uniform
+    }
 }
 
 /// Type of normalization algorithm.
@@ -53,7 +55,9 @@ impl ToString for NormalizeType {
 }
 
 impl Default for NormalizeType {
-    fn default() -> Self { NormalizeType::Tree }
+    fn default() -> Self {
+        NormalizeType::Tree
+    }
 }
 
 /// Additional parameters for Dart Booster.

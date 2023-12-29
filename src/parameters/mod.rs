@@ -9,19 +9,19 @@
 use std::default::Default;
 use std::fmt::{self, Display};
 
-pub mod tree;
+mod booster;
+pub mod dart;
 pub mod learning;
 pub mod linear;
-pub mod dart;
-mod booster;
+pub mod tree;
 
-use super::DMatrix;
 pub use self::booster::BoosterType;
 use super::booster::CustomObjective;
+use super::DMatrix;
 
 /// Parameters for training boosters.
 /// Created using [`BoosterParametersBuilder`](struct.BoosterParametersBuilder.html).
-#[derive(Builder, Clone)]
+#[derive(Builder, Clone, Default)]
 #[builder(default)]
 pub struct BoosterParameters {
     /// Type of booster (tree, linear or DART) along with its parameters.
@@ -41,17 +41,6 @@ pub struct BoosterParameters {
     ///
     /// *default*: `None` (XGBoost will automatically determing max threads to use)
     threads: Option<u32>,
-}
-
-impl Default for BoosterParameters {
-    fn default() -> Self {
-        BoosterParameters {
-            booster_type: booster::BoosterType::default(),
-            learning_params: learning::LearningTaskParameters::default(),
-            verbose: false,
-            threads: None,
-        }
-    }
 }
 
 impl BoosterParameters {
@@ -127,41 +116,41 @@ pub struct TrainingParameters<'a> {
     /// Number of boosting rounds to use during training.
     ///
     /// *default*: `10`
-    #[builder(default="10")]
+    #[builder(default = "10")]
     pub(crate) boost_rounds: u32,
 
     /// Configuration for the booster model that will be trained.
     ///
     /// *default*: `BoosterParameters::default()`
-    #[builder(default="BoosterParameters::default()")]
+    #[builder(default = "BoosterParameters::default()")]
     pub(crate) booster_params: BoosterParameters,
 
-    #[builder(default="None")]
+    #[builder(default = "None")]
     /// Optional list of DMatrix to evaluate against after each boosting round.
     ///
     /// Supplied as a list of tuples of (DMatrix, description). The description is used to differentiate between
     /// different evaluation datasets when output during training.
     ///
     /// *default*: `None`
-    pub(crate) evaluation_sets: Option<&'a[(&'a DMatrix, &'a str)]>,
+    pub(crate) evaluation_sets: Option<&'a [(&'a DMatrix, &'a str)]>,
 
     /// Optional custom objective function to use for training.
     ///
     /// *default*: `None`
-    #[builder(default="None")]
+    #[builder(default = "None")]
     pub(crate) custom_objective_fn: Option<CustomObjective>,
 
     /// Optional custom evaluation function to use during training.
     ///
     /// *default*: `None`
-    #[builder(default="None")]
+    #[builder(default = "None")]
     pub(crate) custom_evaluation_fn: Option<CustomEvaluation>,
     // TODO: callbacks
 }
 
-impl <'a> TrainingParameters<'a> {
+impl<'a> TrainingParameters<'a> {
     pub fn dtrain(&self) -> &'a DMatrix {
-        &self.dtrain
+        self.dtrain
     }
 
     pub fn set_dtrain(&mut self, dtrain: &'a DMatrix) {
@@ -184,11 +173,11 @@ impl <'a> TrainingParameters<'a> {
         self.booster_params = booster_params.into();
     }
 
-    pub fn evaluation_sets(&self) -> &Option<&'a[(&'a DMatrix, &'a str)]> {
+    pub fn evaluation_sets(&self) -> &Option<&'a [(&'a DMatrix, &'a str)]> {
         &self.evaluation_sets
     }
 
-    pub fn set_evaluation_sets(&mut self, evaluation_sets: Option<&'a[(&'a DMatrix, &'a str)]>) {
+    pub fn set_evaluation_sets(&mut self, evaluation_sets: Option<&'a [(&'a DMatrix, &'a str)]>) {
         self.evaluation_sets = evaluation_sets;
     }
 
@@ -225,11 +214,11 @@ impl<T: Display> Display for Interval<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let lower = match self.min_inclusion {
             Inclusion::Closed => '[',
-            Inclusion::Open   => '(',
+            Inclusion::Open => '(',
         };
         let upper = match self.max_inclusion {
             Inclusion::Closed => ']',
-            Inclusion::Open   => ')',
+            Inclusion::Open => ')',
         };
         write!(f, "{}{}, {}{}", lower, self.min, self.max, upper)
     }
@@ -237,7 +226,12 @@ impl<T: Display> Display for Interval<T> {
 
 impl<T: PartialOrd + Display> Interval<T> {
     fn new(min: T, min_inclusion: Inclusion, max: T, max_inclusion: Inclusion) -> Self {
-        Interval { min, min_inclusion, max, max_inclusion }
+        Interval {
+            min,
+            min_inclusion,
+            max,
+            max_inclusion,
+        }
     }
 
     fn new_open_open(min: T, max: T) -> Self {
@@ -254,26 +248,45 @@ impl<T: PartialOrd + Display> Interval<T> {
 
     fn contains(&self, val: &T) -> bool {
         match self.min_inclusion {
-            Inclusion::Closed => if !(val >= &self.min) { return false; },
-            Inclusion::Open => if !(val > &self.min) { return false; },
+            Inclusion::Closed => {
+                if !(val >= &self.min) {
+                    return false;
+                }
+            }
+            Inclusion::Open => {
+                if !(val > &self.min) {
+                    return false;
+                }
+            }
         }
         match self.max_inclusion {
-            Inclusion::Closed => if !(val <= &self.max) { return false; },
-            Inclusion::Open => if !(val < &self.max) { return false; },
+            Inclusion::Closed => {
+                if !(val <= &self.max) {
+                    return false;
+                }
+            }
+            Inclusion::Open => {
+                if !(val < &self.max) {
+                    return false;
+                }
+            }
         }
         true
     }
 
     fn validate(&self, val: &Option<T>, name: &str) -> Result<(), String> {
-        match val {
+        match &val {
             Some(ref val) => {
                 if self.contains(&val) {
                     Ok(())
                 } else {
-                    Err(format!("Invalid value for '{}' parameter, {} is not in range {}.", name, &val, self))
+                    Err(format!(
+                        "Invalid value for '{}' parameter, {} is not in range {}.",
+                        name, &val, self
+                    ))
                 }
-            },
-            None => Ok(())
+            }
+            None => Ok(()),
         }
     }
 }

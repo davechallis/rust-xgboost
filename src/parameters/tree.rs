@@ -9,7 +9,7 @@ use super::Interval;
 /// [reference paper](http://arxiv.org/abs/1603.02754)).
 ///
 /// Distributed and external memory version only support approximate algorithm.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum TreeMethod {
     /// Use heuristic to choose faster one.
     ///
@@ -17,6 +17,7 @@ pub enum TreeMethod {
     /// * For very large-dataset, approximate algorithm will be chosen.
     /// * Because old behavior is always use exact greedy in single machine, user will get a message when
     ///   approximate algorithm is chosen to notify this choice.
+    #[default]
     Auto,
 
     /// Exact greedy algorithm.
@@ -49,33 +50,24 @@ impl ToString for TreeMethod {
     }
 }
 
-impl Default for TreeMethod {
-    fn default() -> Self { TreeMethod::Auto }
-}
-
-impl From<String> for TreeMethod
-{
-    fn from(s: String) -> Self
-    {
-      use std::borrow::Borrow;
-      Self::from(s.borrow())
+impl From<String> for TreeMethod {
+    fn from(s: String) -> Self {
+        use std::borrow::Borrow;
+        Self::from(s.borrow())
     }
 }
 
-impl<'a> From<&'a str> for TreeMethod
-{
-    fn from(s: &'a str) -> Self
-    {
-      match s
-      {
-        "auto" => TreeMethod::Auto,
-        "exact" => TreeMethod::Exact,
-        "approx" => TreeMethod::Approx,
-        "hist" => TreeMethod::Hist,
-        "gpu_exact" => TreeMethod::GpuExact,
-        "gpu_hist" => TreeMethod::GpuHist,
-        _ => panic!("no known tree_method for {}", s)
-      }
+impl<'a> From<&'a str> for TreeMethod {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "auto" => TreeMethod::Auto,
+            "exact" => TreeMethod::Exact,
+            "approx" => TreeMethod::Approx,
+            "hist" => TreeMethod::Hist,
+            "gpu_exact" => TreeMethod::GpuExact,
+            "gpu_hist" => TreeMethod::GpuHist,
+            _ => panic!("no known tree_method for {}", s),
+        }
     }
 }
 
@@ -125,9 +117,10 @@ impl ToString for TreeUpdater {
 }
 
 /// A type of boosting process to run.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum ProcessType {
     /// The normal boosting process which creates new trees.
+    #[default]
     Default,
 
     /// Starts from an existing model and only updates its trees. In each boosting iteration,
@@ -148,14 +141,11 @@ impl ToString for ProcessType {
     }
 }
 
-impl Default for ProcessType {
-    fn default() -> Self { ProcessType::Default }
-}
-
 /// Controls the way new nodes are added to the tree.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum GrowPolicy {
     /// Split at nodes closest to the root.
+    #[default]
     Depthwise,
 
     /// Split at noeds with highest loss change.
@@ -171,14 +161,11 @@ impl ToString for GrowPolicy {
     }
 }
 
-impl Default for GrowPolicy {
-    fn default() -> Self { GrowPolicy::Depthwise }
-}
-
 /// The type of predictor algorithm to use. Provides the same results but allows the use of GPU or CPU.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum Predictor {
     /// Multicore CPU prediction algorithm.
+    #[default]
     Cpu,
 
     /// Prediction using GPU. Default for ‘gpu_exact’ and ‘gpu_hist’ tree method.
@@ -192,10 +179,6 @@ impl ToString for Predictor {
             Predictor::Gpu => "gpu_predictor".to_owned(),
         }
     }
-}
-
-impl Default for Predictor {
-    fn default() -> Self { Predictor::Cpu }
 }
 
 /// BoosterParameters for Tree Booster. Create using
@@ -404,9 +387,15 @@ impl TreeBoosterParameters {
         // This allows XGBoost to figure it out on it's own, and suppresses the
         // warning message during training.
         // See: https://github.com/davechallis/rust-xgboost/issues/7
-        if self.updater.len() != 0
-        {
-          v.push(("updater".to_owned(), self.updater.iter().map(|u| u.to_string()).collect::<Vec<String>>().join(",")));
+        if !self.updater.is_empty() {
+            v.push((
+                "updater".to_owned(),
+                self.updater
+                    .iter()
+                    .map(|u| u.to_string())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            ));
         }
 
         v

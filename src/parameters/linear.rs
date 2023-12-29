@@ -23,7 +23,9 @@ impl ToString for LinearUpdate {
 }
 
 impl Default for LinearUpdate {
-    fn default() -> Self { LinearUpdate::Shotgun }
+    fn default() -> Self {
+        LinearUpdate::Shotgun
+    }
 }
 
 /// BoosterParameters for Linear Booster.
@@ -47,7 +49,6 @@ pub struct LinearBoosterParameters {
     /// * default: `LinearUpdate::Shotgun`
     updater: LinearUpdate,
 }
-
 
 impl LinearBoosterParameters {
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {

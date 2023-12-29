@@ -1,17 +1,17 @@
-use std::{slice, ffi, ptr, path::Path};
-use libc::{c_uint, c_float};
-use std::os::unix::ffi::OsStrExt;
+use libc::{c_float, c_uint};
 use std::convert::TryInto;
+use std::os::unix::ffi::OsStrExt;
+use std::{ffi, path::Path, ptr, slice};
 
 use xgboost_sys;
 
-use super::{XGBResult, XGBError};
+use super::{XGBError, XGBResult};
 
-static KEY_GROUP_PTR: &'static str = "group_ptr";
-static KEY_GROUP: &'static str = "group";
-static KEY_LABEL: &'static str = "label";
-static KEY_WEIGHT: &'static str = "weight";
-static KEY_BASE_MARGIN: &'static str = "base_margin";
+static KEY_GROUP_PTR: &str = "group_ptr";
+static KEY_GROUP: &str = "group";
+static KEY_LABEL: &str = "label";
+static KEY_WEIGHT: &str = "weight";
+static KEY_BASE_MARGIN: &str = "base_margin";
 
 /// Data matrix used throughout XGBoost for training/predicting [`Booster`](struct.Booster.html) models.
 ///
@@ -88,7 +88,11 @@ impl DMatrix {
         let num_cols = out as usize;
 
         info!("Loaded DMatrix with shape: {}x{}", num_rows, num_cols);
-        Ok(DMatrix { handle, num_rows, num_cols })
+        Ok(DMatrix {
+            handle,
+            num_rows,
+            num_cols,
+        })
     }
 
     /// Create a new `DMatrix` from dense array in row-major order.
@@ -109,11 +113,13 @@ impl DMatrix {
     /// ```
     pub fn from_dense(data: &[f32], num_rows: usize) -> XGBResult<Self> {
         let mut handle = ptr::null_mut();
-        xgb_call!(xgboost_sys::XGDMatrixCreateFromMat(data.as_ptr(),
-                                                      num_rows as xgboost_sys::bst_ulong,
-                                                      (data.len() / num_rows) as xgboost_sys::bst_ulong,
-                                                      f32::NAN,
-                                                      &mut handle))?;
+        xgb_call!(xgboost_sys::XGDMatrixCreateFromMat(
+            data.as_ptr(),
+            num_rows as xgboost_sys::bst_ulong,
+            (data.len() / num_rows) as xgboost_sys::bst_ulong,
+            f32::NAN,
+            &mut handle
+        ))?;
         Ok(DMatrix::new(handle)?)
     }
 
@@ -130,13 +136,15 @@ impl DMatrix {
         let mut handle = ptr::null_mut();
         let indices: Vec<u32> = indices.iter().map(|x| *x as u32).collect();
         let num_cols = num_cols.unwrap_or(0); // infer from data if 0
-        xgb_call!(xgboost_sys::XGDMatrixCreateFromCSREx(indptr.as_ptr(),
-                                                        indices.as_ptr(),
-                                                        data.as_ptr(),
-                                                        indptr.len().try_into().unwrap(),
-                                                        data.len().try_into().unwrap(),
-                                                        num_cols.try_into().unwrap(),
-                                                        &mut handle))?;
+        xgb_call!(xgboost_sys::XGDMatrixCreateFromCSREx(
+            indptr.as_ptr(),
+            indices.as_ptr(),
+            data.as_ptr(),
+            indptr.len().try_into().unwrap(),
+            data.len().try_into().unwrap(),
+            num_cols.try_into().unwrap(),
+            &mut handle
+        ))?;
         Ok(DMatrix::new(handle)?)
     }
 
@@ -153,13 +161,15 @@ impl DMatrix {
         let mut handle = ptr::null_mut();
         let indices: Vec<u32> = indices.iter().map(|x| *x as u32).collect();
         let num_rows = num_rows.unwrap_or(0); // infer from data if 0
-        xgb_call!(xgboost_sys::XGDMatrixCreateFromCSCEx(indptr.as_ptr(),
-                                                        indices.as_ptr(),
-                                                        data.as_ptr(),
-                                                        indptr.len().try_into().unwrap(),
-                                                        data.len().try_into().unwrap(),
-                                                        num_rows.try_into().unwrap(),
-                                                        &mut handle))?;
+        xgb_call!(xgboost_sys::XGDMatrixCreateFromCSCEx(
+            indptr.as_ptr(),
+            indices.as_ptr(),
+            data.as_ptr(),
+            indptr.len().try_into().unwrap(),
+            data.len().try_into().unwrap(),
+            num_rows.try_into().unwrap(),
+            &mut handle
+        ))?;
         Ok(DMatrix::new(handle)?)
     }
 
@@ -190,7 +200,11 @@ impl DMatrix {
         let mut handle = ptr::null_mut();
         let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
         let silent = true;
-        xgb_call!(xgboost_sys::XGDMatrixCreateFromFile(fname.as_ptr(), silent as i32, &mut handle))?;
+        xgb_call!(xgboost_sys::XGDMatrixCreateFromFile(
+            fname.as_ptr(),
+            silent as i32,
+            &mut handle
+        ))?;
         Ok(DMatrix::new(handle)?)
     }
 
@@ -199,7 +213,11 @@ impl DMatrix {
         debug!("Writing DMatrix to: {}", path.as_ref().display());
         let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
         let silent = true;
-        xgb_call!(xgboost_sys::XGDMatrixSaveBinary(self.handle, fname.as_ptr(), silent as i32))
+        xgb_call!(xgboost_sys::XGDMatrixSaveBinary(
+            self.handle,
+            fname.as_ptr(),
+            silent as i32
+        ))
     }
 
     /// Get the number of rows in this matrix.
@@ -222,10 +240,12 @@ impl DMatrix {
         debug!("Slicing {} rows from DMatrix", indices.len());
         let mut out_handle = ptr::null_mut();
         let indices: Vec<i32> = indices.iter().map(|x| *x as i32).collect();
-        xgb_call!(xgboost_sys::XGDMatrixSliceDMatrix(self.handle,
-                                                     indices.as_ptr(),
-                                                     indices.len() as xgboost_sys::bst_ulong,
-                                                     &mut out_handle))?;
+        xgb_call!(xgboost_sys::XGDMatrixSliceDMatrix(
+            self.handle,
+            indices.as_ptr(),
+            indices.len() as xgboost_sys::bst_ulong,
+            &mut out_handle
+        ))?;
         Ok(DMatrix::new(out_handle)?)
     }
 
@@ -280,44 +300,51 @@ impl DMatrix {
         self.get_uint_info(KEY_GROUP_PTR)
     }
 
-
     fn get_float_info(&self, field: &str) -> XGBResult<&[f32]> {
         let field = ffi::CString::new(field).unwrap();
         let mut out_len = 0;
         let mut out_dptr = ptr::null();
-        xgb_call!(xgboost_sys::XGDMatrixGetFloatInfo(self.handle,
-                                                     field.as_ptr(),
-                                                     &mut out_len,
-                                                     &mut out_dptr))?;
+        xgb_call!(xgboost_sys::XGDMatrixGetFloatInfo(
+            self.handle,
+            field.as_ptr(),
+            &mut out_len,
+            &mut out_dptr
+        ))?;
 
         Ok(unsafe { slice::from_raw_parts(out_dptr as *mut c_float, out_len as usize) })
     }
 
     fn set_float_info(&mut self, field: &str, array: &[f32]) -> XGBResult<()> {
         let field = ffi::CString::new(field).unwrap();
-        xgb_call!(xgboost_sys::XGDMatrixSetFloatInfo(self.handle,
-                                                     field.as_ptr(),
-                                                     array.as_ptr(),
-                                                     array.len() as u64))
+        xgb_call!(xgboost_sys::XGDMatrixSetFloatInfo(
+            self.handle,
+            field.as_ptr(),
+            array.as_ptr(),
+            array.len() as u64
+        ))
     }
 
     fn get_uint_info(&self, field: &str) -> XGBResult<&[u32]> {
         let field = ffi::CString::new(field).unwrap();
         let mut out_len = 0;
         let mut out_dptr = ptr::null();
-        xgb_call!(xgboost_sys::XGDMatrixGetUIntInfo(self.handle,
-                                                    field.as_ptr(),
-                                                    &mut out_len,
-                                                    &mut out_dptr))?;
+        xgb_call!(xgboost_sys::XGDMatrixGetUIntInfo(
+            self.handle,
+            field.as_ptr(),
+            &mut out_len,
+            &mut out_dptr
+        ))?;
         Ok(unsafe { slice::from_raw_parts(out_dptr as *mut c_uint, out_len as usize) })
     }
 
     fn set_uint_info(&mut self, field: &str, array: &[u32]) -> XGBResult<()> {
         let field = ffi::CString::new(field).unwrap();
-        xgb_call!(xgboost_sys::XGDMatrixSetUIntInfo(self.handle,
-                                                    field.as_ptr(),
-                                                    array.as_ptr(),
-                                                    array.len() as u64))
+        xgb_call!(xgboost_sys::XGDMatrixSetUIntInfo(
+            self.handle,
+            field.as_ptr(),
+            array.as_ptr(),
+            array.len() as u64
+        ))
     }
 }
 
@@ -329,8 +356,8 @@ impl Drop for DMatrix {
 
 #[cfg(test)]
 mod tests {
-    use tempfile;
     use super::*;
+    use tempfile;
     fn read_train_matrix() -> XGBResult<DMatrix> {
         DMatrix::load("xgboost-sys/xgboost/demo/data/agaricus.txt.train")
     }
@@ -370,7 +397,7 @@ mod tests {
         let mut dmat = read_train_matrix().unwrap();
         assert_eq!(dmat.get_labels().unwrap().len(), 6513);
 
-        let label = [0.1, 0.0 -4.5, 11.29842, 333333.33];
+        let label = [0.1, 0.0 - 4.5, 11.29842, 333333.33];
         assert!(dmat.set_labels(&label).is_ok());
         assert_eq!(dmat.get_labels().unwrap(), label);
     }
@@ -416,7 +443,7 @@ mod tests {
 
         let dmat = DMatrix::from_csr(&indptr, &indices, &data, None).unwrap();
         assert_eq!(dmat.num_rows(), 4);
-        assert_eq!(dmat.num_cols(), 0);  // https://github.com/dmlc/xgboost/pull/7265
+        assert_eq!(dmat.num_cols(), 0); // https://github.com/dmlc/xgboost/pull/7265
 
         let dmat = DMatrix::from_csr(&indptr, &indices, &data, Some(10)).unwrap();
         assert_eq!(dmat.num_rows(), 4);
