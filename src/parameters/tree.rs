@@ -9,7 +9,7 @@ use super::Interval;
 /// [reference paper](http://arxiv.org/abs/1603.02754)).
 ///
 /// Distributed and external memory version only support approximate algorithm.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum TreeMethod {
     /// Use heuristic to choose faster one.
     ///
@@ -17,6 +17,7 @@ pub enum TreeMethod {
     /// * For very large-dataset, approximate algorithm will be chosen.
     /// * Because old behavior is always use exact greedy in single machine, user will get a message when
     ///   approximate algorithm is chosen to notify this choice.
+    #[default]
     Auto,
 
     /// Exact greedy algorithm.
@@ -49,33 +50,24 @@ impl ToString for TreeMethod {
     }
 }
 
-impl Default for TreeMethod {
-    fn default() -> Self { TreeMethod::Auto }
-}
-
-impl From<String> for TreeMethod
-{
-    fn from(s: String) -> Self
-    {
-      use std::borrow::Borrow;
-      Self::from(s.borrow())
+impl From<String> for TreeMethod {
+    fn from(s: String) -> Self {
+        use std::borrow::Borrow;
+        Self::from(s.borrow())
     }
 }
 
-impl<'a> From<&'a str> for TreeMethod
-{
-    fn from(s: &'a str) -> Self
-    {
-      match s
-      {
-        "auto" => TreeMethod::Auto,
-        "exact" => TreeMethod::Exact,
-        "approx" => TreeMethod::Approx,
-        "hist" => TreeMethod::Hist,
-        "gpu_exact" => TreeMethod::GpuExact,
-        "gpu_hist" => TreeMethod::GpuHist,
-        _ => panic!("no known tree_method for {}", s)
-      }
+impl<'a> From<&'a str> for TreeMethod {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "auto" => TreeMethod::Auto,
+            "exact" => TreeMethod::Exact,
+            "approx" => TreeMethod::Approx,
+            "hist" => TreeMethod::Hist,
+            "gpu_exact" => TreeMethod::GpuExact,
+            "gpu_hist" => TreeMethod::GpuHist,
+            _ => panic!("no known tree_method for {}", s),
+        }
     }
 }
 
@@ -125,9 +117,10 @@ impl ToString for TreeUpdater {
 }
 
 /// A type of boosting process to run.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum ProcessType {
     /// The normal boosting process which creates new trees.
+    #[default]
     Default,
 
     /// Starts from an existing model and only updates its trees. In each boosting iteration,
@@ -148,14 +141,11 @@ impl ToString for ProcessType {
     }
 }
 
-impl Default for ProcessType {
-    fn default() -> Self { ProcessType::Default }
-}
-
 /// Controls the way new nodes are added to the tree.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum GrowPolicy {
     /// Split at nodes closest to the root.
+    #[default]
     Depthwise,
 
     /// Split at noeds with highest loss change.
@@ -171,14 +161,11 @@ impl ToString for GrowPolicy {
     }
 }
 
-impl Default for GrowPolicy {
-    fn default() -> Self { GrowPolicy::Depthwise }
-}
-
 /// The type of predictor algorithm to use. Provides the same results but allows the use of GPU or CPU.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum Predictor {
     /// Multicore CPU prediction algorithm.
+    #[default]
     Cpu,
 
     /// Prediction using GPU. Default for ‘gpu_exact’ and ‘gpu_hist’ tree method.
@@ -192,10 +179,6 @@ impl ToString for Predictor {
             Predictor::Gpu => "gpu_predictor".to_owned(),
         }
     }
-}
-
-impl Default for Predictor {
-    fn default() -> Self { Predictor::Cpu }
 }
 
 /// BoosterParameters for Tree Booster. Create using
@@ -374,39 +357,44 @@ impl Default for TreeBoosterParameters {
 
 impl TreeBoosterParameters {
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
-        let mut v = Vec::new();
-
-        v.push(("booster".to_owned(), "gbtree".to_owned()));
-
-        v.push(("eta".to_owned(), self.eta.to_string()));
-        v.push(("gamma".to_owned(), self.gamma.to_string()));
-        v.push(("max_depth".to_owned(), self.max_depth.to_string()));
-        v.push(("min_child_weight".to_owned(), self.min_child_weight.to_string()));
-        v.push(("max_delta_step".to_owned(), self.max_delta_step.to_string()));
-        v.push(("subsample".to_owned(), self.subsample.to_string()));
-        v.push(("colsample_bytree".to_owned(), self.colsample_bytree.to_string()));
-        v.push(("colsample_bylevel".to_owned(), self.colsample_bylevel.to_string()));
-        v.push(("colsample_bynode".to_owned(), self.colsample_bynode.to_string()));
-        v.push(("lambda".to_owned(), self.lambda.to_string()));
-        v.push(("alpha".to_owned(), self.alpha.to_string()));
-        v.push(("tree_method".to_owned(), self.tree_method.to_string()));
-        v.push(("sketch_eps".to_owned(), self.sketch_eps.to_string()));
-        v.push(("scale_pos_weight".to_owned(), self.scale_pos_weight.to_string()));
-        v.push(("refresh_leaf".to_owned(), (self.refresh_leaf as u8).to_string()));
-        v.push(("process_type".to_owned(), self.process_type.to_string()));
-        v.push(("grow_policy".to_owned(), self.grow_policy.to_string()));
-        v.push(("max_leaves".to_owned(), self.max_leaves.to_string()));
-        v.push(("max_bin".to_owned(), self.max_bin.to_string()));
-        v.push(("num_parallel_tree".to_owned(), self.num_parallel_tree.to_string()));
-        v.push(("predictor".to_owned(), self.predictor.to_string()));
+        let mut v = vec![
+            ("booster".to_owned(), "gbtree".to_owned()),
+            ("eta".to_owned(), self.eta.to_string()),
+            ("gamma".to_owned(), self.gamma.to_string()),
+            ("max_depth".to_owned(), self.max_depth.to_string()),
+            ("min_child_weight".to_owned(), self.min_child_weight.to_string()),
+            ("max_delta_step".to_owned(), self.max_delta_step.to_string()),
+            ("subsample".to_owned(), self.subsample.to_string()),
+            ("colsample_bytree".to_owned(), self.colsample_bytree.to_string()),
+            ("colsample_bylevel".to_owned(), self.colsample_bylevel.to_string()),
+            ("colsample_bynode".to_owned(), self.colsample_bynode.to_string()),
+            ("lambda".to_owned(), self.lambda.to_string()),
+            ("alpha".to_owned(), self.alpha.to_string()),
+            ("tree_method".to_owned(), self.tree_method.to_string()),
+            ("sketch_eps".to_owned(), self.sketch_eps.to_string()),
+            ("scale_pos_weight".to_owned(), self.scale_pos_weight.to_string()),
+            ("refresh_leaf".to_owned(), (self.refresh_leaf as u8).to_string()),
+            ("process_type".to_owned(), self.process_type.to_string()),
+            ("grow_policy".to_owned(), self.grow_policy.to_string()),
+            ("max_leaves".to_owned(), self.max_leaves.to_string()),
+            ("max_bin".to_owned(), self.max_bin.to_string()),
+            ("num_parallel_tree".to_owned(), self.num_parallel_tree.to_string()),
+            ("predictor".to_owned(), self.predictor.to_string()),
+        ];
 
         // Don't pass anything to XGBoost if the user didn't specify anything.
         // This allows XGBoost to figure it out on it's own, and suppresses the
         // warning message during training.
         // See: https://github.com/davechallis/rust-xgboost/issues/7
-        if self.updater.len() != 0
-        {
-          v.push(("updater".to_owned(), self.updater.iter().map(|u| u.to_string()).collect::<Vec<String>>().join(",")));
+        if !self.updater.is_empty() {
+            v.push((
+                "updater".to_owned(),
+                self.updater
+                    .iter()
+                    .map(|u| u.to_string())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            ));
         }
 
         v

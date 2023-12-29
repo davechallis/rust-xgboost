@@ -12,9 +12,9 @@ fn main() {
 
     // load train and test matrices from text files (in LibSVM format).
     println!("Loading train and test matrices...");
-    let dtrain = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.train").unwrap();
+    let dtrain = DMatrix::load(r#"{"uri": "../../xgboost-sys/xgboost/demo/data/agaricus.txt.train?format=libsvm"}"#).unwrap();
     println!("Train matrix: {}x{}", dtrain.num_rows(), dtrain.num_cols());
-    let dtest = DMatrix::load("../../xgboost-sys/xgboost/demo/data/agaricus.txt.test").unwrap();
+    let dtest = DMatrix::load(r#"{"uri": "../../xgboost-sys/xgboost/demo/data/agaricus.txt.test?format=libsvm"}"#).unwrap();
     println!("Test matrix: {}x{}", dtest.num_rows(), dtest.num_cols());
 
     // configure objectives, metrics, etc.

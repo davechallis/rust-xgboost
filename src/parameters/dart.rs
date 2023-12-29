@@ -6,9 +6,10 @@ use std::default::Default;
 use super::Interval;
 
 /// Type of sampling algorithm.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum SampleType {
     /// Dropped trees are selected uniformly.
+    #[default]
     Uniform,
 
     /// Dropped trees are selected in proportion to weight.
@@ -24,16 +25,13 @@ impl ToString for SampleType {
     }
 }
 
-impl Default for SampleType {
-    fn default() -> Self { SampleType::Uniform }
-}
-
 /// Type of normalization algorithm.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum NormalizeType {
     /// New trees have the same weight of each of dropped trees.
     /// * weight of new trees are 1 / (k + learning_rate)
     /// dropped trees are scaled by a factor of k / (k + learning_rate)
+    #[default]
     Tree,
 
     /// New trees have the same weight of sum of dropped trees (forest).
@@ -50,10 +48,6 @@ impl ToString for NormalizeType {
             NormalizeType::Forest => "forest".to_owned(),
         }
     }
-}
-
-impl Default for NormalizeType {
-    fn default() -> Self { NormalizeType::Tree }
 }
 
 /// Additional parameters for Dart Booster.
@@ -96,17 +90,14 @@ impl Default for DartBoosterParameters {
 
 impl DartBoosterParameters {
     pub(crate) fn as_string_pairs(&self) -> Vec<(String, String)> {
-        let mut v = Vec::new();
-
-        v.push(("booster".to_owned(), "dart".to_owned()));
-
-        v.push(("sample_type".to_owned(), self.sample_type.to_string()));
-        v.push(("normalize_type".to_owned(), self.normalize_type.to_string()));
-        v.push(("rate_drop".to_owned(), self.rate_drop.to_string()));
-        v.push(("one_drop".to_owned(), (self.one_drop as u8).to_string()));
-        v.push(("skip_drop".to_owned(), self.skip_drop.to_string()));
-
-        v
+        vec![
+            ("booster".to_owned(), "dart".to_owned()),
+            ("sample_type".to_owned(), self.sample_type.to_string()),
+            ("normalize_type".to_owned(), self.normalize_type.to_string()),
+            ("rate_drop".to_owned(), self.rate_drop.to_string()),
+            ("one_drop".to_owned(), (self.one_drop as u8).to_string()),
+            ("skip_drop".to_owned(), self.skip_drop.to_string()),
+        ]
     }
 }
 
