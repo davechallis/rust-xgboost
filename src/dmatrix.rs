@@ -206,6 +206,19 @@ impl DMatrix {
         DMatrix::new(handle)
     }
 
+
+    pub fn load_binary<P: AsRef<Path>>(path: P) -> XGBResult<Self> {
+        debug!("Loading DMatrix from: {}", path.as_ref().display());
+        let mut handle = ptr::null_mut();
+        let fname = ffi::CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
+        xgb_call!(xgboost_sys::XGDMatrixCreateFromFile(
+            fname.as_ptr(),
+            1,
+            &mut handle
+        )).unwrap();
+        DMatrix::new(handle)
+    }
+
     /// Serialise this `DMatrix` as a binary file to given path.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> XGBResult<()> {
         debug!("Writing DMatrix to: {}", path.as_ref().display());
@@ -383,12 +396,10 @@ mod tests {
         let out_path = tmp_dir.path().join("dmat.bin");
         dmat.save(&out_path).unwrap();
 
-        let out_path = out_path.to_string_lossy();
-        // let read_path = format!(r#"{{"uri": "{out_path}?format=csv"}}"#);
-        // let dmat2 = DMatrix::load(&read_path).unwrap();
+        let dmat2 = DMatrix::load_binary(out_path).unwrap();
 
-        // assert_eq!(dmat.num_rows(), dmat2.num_rows());
-        // assert_eq!(dmat.num_cols(), dmat2.num_cols());
+        assert_eq!(dmat.num_rows(), dmat2.num_rows());
+        assert_eq!(dmat.num_cols(), dmat2.num_cols());
         // TODO: check contents as well, if possible
     }
 
